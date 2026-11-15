@@ -63,10 +63,14 @@ class DatabaseConnection
                 }
                 $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
             }
+            // Use Vietnam timezone (+07:00) by default in PHP and DB session so NOW() matches local user time instead of UTC
+            date_default_timezone_set(getenv('CW_TIMEZONE') ?: 'Asia/Ho_Chi_Minh');
             // Establish the PDO connection
             $this->connection = new PDO($dsn, $this->username, $this->password, $options);
             // Disable ONLY_FULL_GROUP_BY per session so legacy GROUP BY f.id queries work on TiDB Cloud / MySQL 8
             $this->connection->exec("SET SESSION sql_mode = TRIM(BOTH ',' FROM REPLACE(REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''), ',,', ','))");
+            // Align MySQL/TiDB session timezone with PHP local timezone
+            $this->connection->exec("SET time_zone = '+07:00'");
         } catch (PDOException $e) {
             // Halt execution and escape error output to prevent XSS
             die('<p style="color:red;font-family:monospace;padding:2rem">DB Error: ' . htmlspecialchars($e->getMessage()) . '</p>');
