@@ -893,3 +893,47 @@ tbody tr:hover td {
     padding: 1.25rem 1rem;
   }
 }
+
+/* ── PAGINATION (PILL BAR) ── */
+.pagination-nav {
+  display: flex;
+  justify-content: center;
+}
+.pagination-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+}
+.pagination-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.pagination-link:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.pagination-item.is-active .pagination-link {
+  background: var(--gold);
+  color: #111;
+  box-shadow: 0 0 14px rgba(153, 225, 217, 0.45);
+}
+.pagination-item.is-disabled .pagination-link {
+  color: var(--text-dimmer);
+  pointer-events: none;
+  opacity: 0.55;
+}

@@ -127,9 +127,15 @@ if (isset($_GET['edit'])) { // Check if an edit film ID was passed in query stri
     $editFilm = getFilmByIdForAdmin($eid); // Fetch film record for form pre-population
 }
 
-// Fetch films and genres for display
-$films  = getAllFilms(); // Query all films with review counts and average ratings
-$genres = getAllGenres(); // Query all genres for the form dropdown
+// Fetch paginated films (10 per page) and genres for display
+$repo       = new CinemaRepository();
+$limit      = 10;
+$totalFilms = $repo->countFilms();
+$totalPages = max(1, (int)ceil($totalFilms / $limit));
+$page       = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
+$offset     = ($page - 1) * $limit;
+$films      = $repo->getAllFilms('', '', '', $limit, $offset); // Query 10 films for the current admin page
+$genres     = getAllGenres(); // Query all genres for the form dropdown
 
 ob_start(); // Begin output buffering to capture films management view
 ?>
@@ -401,6 +407,11 @@ ob_start(); // Begin output buffering to capture films management view
             </tbody>
         </table>
     </div>
+    <?php if ($totalPages > 1): ?>
+        <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);">
+            <?= renderPagination($page, $totalPages, 'films.php', isset($_GET['edit']) ? ['edit' => (int)$_GET['edit']] : []) ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <!-- ADMIN TRAILER MODAL POPUP -->
