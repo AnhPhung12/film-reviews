@@ -150,10 +150,13 @@ $currentUserId = (int)($_SESSION['user_id'] ?? 0); // Logged-in user ID for revi
 
     <!-- Reviews section -->
     <div class="film-reviews-section">
-        <h2 class="sub-title">
-            Reviews
-            <span class="count-badge"><?= count($reviews) ?></span> <!-- Show number of reviews in badge -->
-        </h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap;">
+            <h2 class="sub-title" style="margin-bottom:0;">
+                Reviews
+                <span class="count-badge"><?= count($reviews) ?></span> <!-- Show number of reviews in badge -->
+            </h2>
+            <a href="add_review.php?film=<?= (int)$film['id'] ?>" class="btn btn-primary btn-sm">+ Add Review</a>
+        </div>
 
         <!-- Empty state -->
         <?php if (empty($reviews)): ?>
