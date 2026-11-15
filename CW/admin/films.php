@@ -136,14 +136,17 @@ $page       = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
 $offset     = ($page - 1) * $limit;
 $films      = $repo->getAllFilms('', '', '', $limit, $offset); // Query 10 films for the current admin page
 $genres     = getAllGenres(); // Query all genres for the form dropdown
+$showForm   = isset($_GET['add']) || !empty($editFilm); // Show Add/Edit form page only when requested
 
 ob_start(); // Begin output buffering to capture films management view
 ?>
 
+<?php if ($showForm): ?>
 <!-- Form card for Add or Edit Film -->
 <div class="form-card">
-    <div class="form-card-title">
-        <?= $editFilm ? '✏️ Edit Film: ' . htmlspecialchars($editFilm['title']) : '➕ Add New Film' ?>
+    <div class="form-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <span><?= $editFilm ? '✏️ Edit Film: ' . htmlspecialchars($editFilm['title']) : '➕ Add New Film' ?></span>
+        <a href="films.php" class="btn btn-ghost btn-sm">← Back to Films</a>
     </div>
     <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="action" value="<?= $editFilm ? 'edit' : 'add' ?>">
@@ -267,23 +270,24 @@ ob_start(); // Begin output buffering to capture films management view
 
         <!-- Form action buttons -->
         <div class="form-footer">
-            <?php if ($editFilm): ?>
-                <a href="films.php" class="btn btn-ghost">Cancel</a>
-            <?php endif; ?>
+            <a href="films.php" class="btn btn-ghost">Cancel</a>
             <button type="submit" class="btn btn-primary">
                 <?= $editFilm ? '💾 Save Changes' : '➕ Add Film' ?>
             </button>
         </div>
     </form>
 </div>
+<?php endif; ?>
 
+<?php if (!$showForm): ?>
 <!-- ALL FILMS DIRECTORY TABLE -->
 <div class="card">
-    <div class="card-header">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
         <div class="card-title">
             <img src="icons/films.png" class="card-title-icon" alt=""> All Films Catalog
-            <span class="badge badge-gray"><?= count($films) ?></span>
+            <span class="badge badge-gray"><?= $totalFilms ?></span>
         </div>
+        <a href="films.php?add=1" class="btn btn-primary btn-sm">➕ Add New Film</a>
     </div>
     <div class="table-wrap">
         <table>
@@ -413,6 +417,7 @@ ob_start(); // Begin output buffering to capture films management view
         </div>
     <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <!-- ADMIN TRAILER MODAL POPUP -->
 <div id="adminTrailerModal" class="trailer-modal" aria-hidden="true" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center">
@@ -484,6 +489,7 @@ ob_start(); // Begin output buffering to capture films management view
     });
 </script>
 
+<?php if ($showForm): ?>
 <!-- TinyMCE Rich Text Editor for Admin -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.3/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
@@ -507,6 +513,7 @@ ob_start(); // Begin output buffering to capture films management view
         });
     });
 </script>
+<?php endif; ?>
 
 <?php
 $content = ob_get_clean(); // Capture buffered films management HTML into $content
