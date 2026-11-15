@@ -52,7 +52,7 @@ $currentUserId = (int)($_SESSION['user_id'] ?? 0); // Logged-in user ID for revi
         <div class="filter-group">
             <label for="genre" class="filter-label">Genre</label>
             <div class="custom-select-wrap">
-                <select id="genre" name="genre" class="filter-select">
+                <select id="genre" name="genre" class="filter-select" onchange="this.form.submit()">
                     <option value="">All Genres</option>
                     <!-- Genre options -->
                     <?php foreach ($genres as $g): ?>
@@ -64,11 +64,26 @@ $currentUserId = (int)($_SESSION['user_id'] ?? 0); // Logged-in user ID for revi
                 <span class="select-arrow">▾</span>
             </div>
         </div>
+        <!-- Country Filter -->
+        <div class="filter-group">
+            <label for="country" class="filter-label">Country</label>
+            <div class="custom-select-wrap">
+                <select id="country" name="country" class="filter-select" onchange="this.form.submit()">
+                    <option value="">All Countries</option>
+                    <?php foreach ($countries ?? [] as $c): ?>
+                        <option value="<?= htmlspecialchars($c) ?>" <?= ($selectedCountry ?? '') === $c ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($c) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <span class="select-arrow">▾</span>
+            </div>
+        </div>
         <!-- Filter Actions -->
         <div class="filter-actions">
             <button type="submit" class="btn btn-primary">Filter</button>
             <!-- Clear Filters Link -->
-            <?php if ($search || $selectedGenre): ?>
+            <?php if ($search || $selectedGenre || !empty($selectedCountry)): ?>
                 <a href="reviews.php" class="btn btn-ghost">Clear</a>
             <?php endif; ?>
         </div>

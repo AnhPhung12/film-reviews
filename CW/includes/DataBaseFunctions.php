@@ -397,8 +397,8 @@ class CinemaRepository
         return $st->fetchAll(); // Return film reviews
     }
 
-    /** Counts reviews matching optional film title search and genre filter. */
-    public function countReviewsFiltered(string $search = '', string|int $genreId = ''): int
+    /** Counts reviews matching optional film title search, genre filter, and country filter. */
+    public function countReviewsFiltered(string $search = '', string|int $genreId = '', string $country = ''): int
     {
         $sql = "SELECT COUNT(r.id)
                 FROM review r
@@ -414,13 +414,17 @@ class CinemaRepository
             $sql .= " AND f.genreid = ?";
             $params[] = (int)$genreId;
         }
+        if ($country !== '') { // Filter by film country
+            $sql .= " AND f.country = ?";
+            $params[] = $country;
+        }
         $st = $this->db->prepare($sql); // Prepare count query
         $st->execute($params); // Execute with filters
         return (int)$st->fetchColumn(); // Return integer review count
     }
 
     /** Returns filtered, multi-column sorted, and paginated reviews using an allowlisted ORDER BY map. */
-    public function getAllReviewsFiltered(string $search = '', string|int $genreId = '', array|string $sort = [], int $limit = 0, int $offset = 0): array
+    public function getAllReviewsFiltered(string $search = '', string|int $genreId = '', array|string $sort = [], int $limit = 0, int $offset = 0, string $country = ''): array
     {
         $db = $this->db; // Local reference to PDO handle
         $sql = "SELECT r.*, r.reviewtext AS text, r.reviewdate AS date, r.reviewtime AS review_time, rv.fullname, rv.email, rv.avatar,
@@ -439,6 +443,10 @@ class CinemaRepository
         if ($genreId !== '') { // Filter by film genre ID
             $sql .= " AND f.genreid = ?";
             $params[] = (int)$genreId;
+        }
+        if ($country !== '') { // Filter by film country
+            $sql .= " AND f.country = ?";
+            $params[] = $country;
         }
 
         // Allowlist of supported sort keys to prevent SQL injection in ORDER BY

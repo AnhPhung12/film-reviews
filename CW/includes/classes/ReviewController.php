@@ -22,16 +22,16 @@ class ReviewController
         $this->cinema = $cinema ?? new CinemaRepository(); // Use injected repository or create default
     }
 
-    /** Counts reviews matching optional film title search and genre filter. */
-    public function countFiltered(string $search = '', string|int $genreId = ''): int
+    /** Counts reviews matching optional film title search, genre filter, and country filter. */
+    public function countFiltered(string $search = '', string|int $genreId = '', string $country = ''): int
     {
-        return $this->cinema->countReviewsFiltered($search, $genreId); // Delegate filtered review count
+        return $this->cinema->countReviewsFiltered($search, $genreId, $country); // Delegate filtered review count
     }
 
     /** Returns filtered, sorted, and paginated reviews. */
-    public function listFiltered(string $search = '', string|int $genreId = '', array|string $sort = [], int $limit = 0, int $offset = 0): array
+    public function listFiltered(string $search = '', string|int $genreId = '', array|string $sort = [], int $limit = 0, int $offset = 0, string $country = ''): array
     {
-        return $this->cinema->getAllReviewsFiltered($search, $genreId, $sort, $limit, $offset); // Delegate filtered/sorted review list
+        return $this->cinema->getAllReviewsFiltered($search, $genreId, $sort, $limit, $offset, $country); // Delegate filtered/sorted review list
     }
 
     /** Sanitizes review HTML and persists a new review for a film. */
