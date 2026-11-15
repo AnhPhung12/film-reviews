@@ -33,7 +33,7 @@
         </div>
         <!-- Form Footer -->
         <div class="form-footer" style="margin-top: 1.5rem;">
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Register</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; text-align: center;">Register</button>
         </div>
         <!-- Login Link -->
         <div style="text-align:center; margin-top:1rem; font-size:0.9rem;">
