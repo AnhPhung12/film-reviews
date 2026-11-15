@@ -65,6 +65,8 @@ class DatabaseConnection
             }
             // Establish the PDO connection
             $this->connection = new PDO($dsn, $this->username, $this->password, $options);
+            // Disable ONLY_FULL_GROUP_BY per session so legacy GROUP BY f.id queries work on TiDB Cloud / MySQL 8
+            $this->connection->exec("SET SESSION sql_mode = TRIM(BOTH ',' FROM REPLACE(REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''), ',,', ','))");
         } catch (PDOException $e) {
             // Halt execution and escape error output to prevent XSS
             die('<p style="color:red;font-family:monospace;padding:2rem">DB Error: ' . htmlspecialchars($e->getMessage()) . '</p>');
