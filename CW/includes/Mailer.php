@@ -12,16 +12,19 @@
  */
 class Mailer
 {
-    /** Checks whether required SMTP host, username, and password are configured. */
+    /** Checks whether an HTTPS mail API (Brevo / Webhook) or SMTP credentials are configured. */
     public static function isConfigured(): bool
     {
+        if (trim((string)(getenv('CW_BREVO_API_KEY') ?: '')) !== '' || trim((string)(getenv('CW_MAIL_WEBHOOK_URL') ?: '')) !== '') {
+            return true;
+        }
         $cfg = self::loadConfig(); // Load SMTP configuration array
         return trim((string)($cfg['host'] ?? '')) !== '' // Verify host is non-empty
             && trim((string)($cfg['username'] ?? '')) !== '' // Verify username is non-empty
             && trim((string)($cfg['password'] ?? '')) !== ''; // Verify password is non-empty
     }
 
-    /** Sends an email via SMTP (or falls back to PHP mail() if sendmail_path is configured). */
+    /** Sends an email via HTTPS API (Render-compatible) or SMTP (fallback for local/VPS). */
     public static function send(
         string $toEmail,
         string $toName,
@@ -37,6 +40,46 @@ class Mailer
         $password = (string)($cfg['password'] ?? ''); // SMTP auth password/app password
         $fromEmail = trim((string)($cfg['from_email'] ?? '')) ?: $username; // Sender address (falls back to username)
         $fromName = trim((string)($cfg['from_name'] ?? 'Cine')); // Sender display name
+
+        // Auto-generate plain-text alternative from HTML if not provided
+        if ($textBody === '') {
+            $textBody = trim(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>'], "\n", $htmlBody))); // Convert line-break tags to newlines and strip HTML
+        }
+
+        // 1. Prefer HTTPS Brevo API when CW_BREVO_API_KEY is set (bypasses Render Free outbound SMTP port blocks)
+        $brevoKey = trim((string)(getenv('CW_BREVO_API_KEY') ?: ''));
+        if ($brevoKey !== '') {
+            $senderEmail = $fromEmail ?: 'noreply@example.com';
+            $payload = json_encode([
+                'sender'      => ['name' => $fromName, 'email' => $senderEmail],
+                'to'          => [['email' => $toEmail, 'name' => $toName ?: $toEmail]],
+                'subject'     => $subject,
+                'htmlContent' => $htmlBody,
+                'textContent' => $textBody,
+            ], JSON_UNESCAPED_UNICODE);
+            return self::postJson('https://api.brevo.com/v3/smtp/email', $payload, [
+                'api-key: ' . $brevoKey,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ]);
+        }
+
+        // 2. Or use an HTTPS Mail Webhook (e.g. Google Apps Script Web App) when CW_MAIL_WEBHOOK_URL is set
+        $webhookUrl = trim((string)(getenv('CW_MAIL_WEBHOOK_URL') ?: ''));
+        if ($webhookUrl !== '') {
+            $payload = json_encode([
+                'to'       => $toEmail,
+                'toName'   => $toName ?: $toEmail,
+                'fromName' => $fromName,
+                'subject'  => $subject,
+                'html'     => $htmlBody,
+                'text'     => $textBody,
+            ], JSON_UNESCAPED_UNICODE);
+            return self::postJson($webhookUrl, $payload, [
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ]);
+        }
 
         // Fallback to native mail() when SMTP credentials are absent
         if ($host === '' || $username === '' || $password === '') {
@@ -149,6 +192,33 @@ class Mailer
             }
             return ['ok' => false, 'error' => $e->getMessage()]; // Return error details
         }
+    }
+
+    /** Sends an HTTPS JSON POST request (used for Brevo API or Google Apps Script webhook). */
+    private static function postJson(string $url, string $jsonPayload, array $headers): array
+    {
+        $ctx = stream_context_create([
+            'http' => [
+                'method'          => 'POST',
+                'header'          => implode("\r\n", $headers),
+                'content'         => $jsonPayload,
+                'timeout'         => 15,
+                'ignore_errors'   => true,
+                'follow_location' => 1,
+            ],
+            'ssl' => [
+                'verify_peer'      => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $response = @file_get_contents($url, false, $ctx);
+        $statusLine = $http_response_header[0] ?? '';
+        $code = preg_match('/\s(\d{3})\s/', $statusLine, $m) ? (int)$m[1] : 0;
+        if ($response !== false && $code >= 200 && $code < 300) {
+            return ['ok' => true, 'error' => ''];
+        }
+        $detail = is_string($response) && $response !== '' ? trim(strip_tags($response)) : $statusLine;
+        return ['ok' => false, 'error' => 'Mail API error (' . $code . '): ' . mb_substr($detail, 0, 200)];
     }
 
     /** Loads SMTP settings from mail_config.php. */
