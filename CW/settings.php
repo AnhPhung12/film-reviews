@@ -86,6 +86,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') { // Process form actions on 
                 'code_hash'           => hash('sha256', $otpCode), // Store SHA-256 hash instead of plaintext code
                 'expires_at'          => time() + 600, // Set 10-minute expiration timestamp
                 'resend_available_at' => time() + 10, // Enforce 10-second resend cooldown
+                'verified'            => false, // Require Step 2 OTP verification before password entry
                 'attempts'            => 0, // Initialize failed verification attempt counter
             ];
 
@@ -116,25 +117,22 @@ HTML; // End heredoc HTML OTP email body
                 exit; // Stop execution
             }
         }
-    } elseif ($action === 'verify_change_password') { // Verify OTP and apply new password
-        // Verify 4-digit OTP and update password
-        $otpInput        = trim($_POST['otp_code'] ?? ''); // Read submitted 4-digit code
-        $newPassword     = $_POST['new_password'] ?? ''; // Read new password input
-        $confirmPassword = $_POST['confirm_password'] ?? ''; // Read password confirmation input
-        $otpData         = $_SESSION['pwd_otp'] ?? null; // Retrieve active OTP session payload
+    } elseif ($action === 'verify_otp') { // Step 2: Verify 4-digit OTP before showing new password fields
+        $otpInput = trim($_POST['otp_code'] ?? '');
+        $otpData  = $_SESSION['pwd_otp'] ?? null;
 
-        if (!$otpData || (int)$otpData['user_id'] !== (int)$user['id'] || time() > (int)$otpData['expires_at']) { // Check OTP existence, owner, and expiry
-            unset($_SESSION['pwd_otp']); // Clear expired/invalid OTP state
-            $flashMessage = 'Your security code has expired. Please request a new code.'; // Inform user of expiry
-            $flashType    = 'error'; // Style alert as error
-        } elseif (!preg_match('/^\d{4}$/', $otpInput) || !hash_equals($otpData['code_hash'], hash('sha256', $otpInput))) { // Constant-time OTP hash comparison
-            // Incorrect OTP: automatically issue & email a fresh 4-digit OTP and restart 10s timer
+        if (!$otpData || (int)$otpData['user_id'] !== (int)$user['id'] || time() > (int)$otpData['expires_at']) {
+            unset($_SESSION['pwd_otp']);
+            $flashMessage = 'Your security code has expired. Please request a new code.';
+            $flashType    = 'error';
+        } elseif (!preg_match('/^\d{4}$/', $otpInput) || !hash_equals($otpData['code_hash'], hash('sha256', $otpInput))) {
             $newOtp = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             $_SESSION['pwd_otp'] = [
                 'user_id'             => (int)$user['id'],
                 'code_hash'           => hash('sha256', $newOtp),
                 'expires_at'          => time() + 600,
                 'resend_available_at' => time() + 10,
+                'verified'            => false,
                 'attempts'            => 0,
             ];
             $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8');
@@ -149,7 +147,23 @@ HTML; // End heredoc HTML OTP email body
             $flashMessage = $retryMail['ok']
                 ? 'Invalid 4-digit code! A new OTP has been sent to ' . $user['email'] . '.'
                 : 'Invalid 4-digit code, and could not resend new OTP: ' . $retryMail['error'];
-            $flashType = 'error'; // Style alert as error
+            $flashType = 'error';
+        } else {
+            $_SESSION['pwd_otp']['verified'] = true;
+            $_SESSION['flash']               = 'OTP verified! Please enter your new password.';
+            $_SESSION['flash_type']          = 'success';
+            header('Location: settings.php');
+            exit;
+        }
+    } elseif ($action === 'verify_change_password') { // Step 3: Save new password after OTP verification
+        $newPassword     = $_POST['new_password'] ?? ''; // Read new password input
+        $confirmPassword = $_POST['confirm_password'] ?? ''; // Read password confirmation input
+        $otpData         = $_SESSION['pwd_otp'] ?? null; // Retrieve active OTP session payload
+
+        if (!$otpData || (int)$otpData['user_id'] !== (int)$user['id'] || empty($otpData['verified']) || time() > (int)$otpData['expires_at']) { // Check OTP existence, owner, verification, and expiry
+            unset($_SESSION['pwd_otp']); // Clear expired/invalid OTP state
+            $flashMessage = 'Your security session has expired. Please request a new code.'; // Inform user of expiry
+            $flashType    = 'error'; // Style alert as error
         } elseif (strlen($newPassword) < 6) { // Enforce minimum 6-character password length
             $flashMessage = 'New password must contain at least 6 characters.'; // Set length error
             $flashType    = 'error'; // Style alert as error
@@ -191,11 +205,13 @@ HTML; // End heredoc HTML OTP email body
 }
 
 // Determine whether an unexpired OTP verification step is currently active
-$otpPending = !empty($_SESSION['pwd_otp']) // Check if OTP session data exists, matches user, and is unexpired
+$otpActive = !empty($_SESSION['pwd_otp'])
     && (int)($_SESSION['pwd_otp']['user_id'] ?? 0) === (int)$user['id']
     && time() <= (int)($_SESSION['pwd_otp']['expires_at'] ?? 0);
+$otpVerified = $otpActive && !empty($_SESSION['pwd_otp']['verified']);
+$otpPending  = $otpActive && !$otpVerified;
 
-if (!$otpPending && isset($_SESSION['pwd_otp'])) { // Clean up expired OTP data if still in session
+if (!$otpActive && isset($_SESSION['pwd_otp'])) { // Clean up expired OTP data if still in session
     unset($_SESSION['pwd_otp']); // Remove stale OTP array
 }
 $settingsResendRemaining = $otpPending ? max(0, (int)($_SESSION['pwd_otp']['resend_available_at'] ?? 0) - time()) : 0;

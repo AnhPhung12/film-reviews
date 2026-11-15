@@ -1,19 +1,16 @@
 <?php
 /**
- * forgot_password.php — 4-Digit Email OTP Password Reset Controller.
+ * forgot_password.php — 3-Step 4-Digit Email OTP Password Reset Controller.
  *
- * Purpose:     Step 1: Accepts a user's email and emails a 4-digit OTP.
- *              Step 2: Verifies the 4-digit OTP + new password (min 6 chars).
- *              If OTP mismatches, automatically issues & emails a fresh OTP with
- *              a 10-second resend cooldown.
- * Connections: Uses UserRepository and Mailer, rendering templates/forgot_password.html.php.
+ * Step 1: Enter email address -> send 4-digit OTP.
+ * Step 2: Enter 4-digit OTP (with 10s resend timer). Mismatch auto-issues a new OTP.
+ * Step 3: Set new password (strictly >= 6 characters).
  */
 
-session_start(); // Start or resume session for auth check, OTP state, and flash messages
-require_once __DIR__ . '/includes/DataBaseFunctions.php'; // Load UserRepository and database helpers
-require_once __DIR__ . '/includes/Mailer.php'; // Load Mailer utility
+session_start();
+require_once __DIR__ . '/includes/DataBaseFunctions.php';
+require_once __DIR__ . '/includes/Mailer.php';
 
-// Redirect authenticated users to homepage
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
     exit;
@@ -24,7 +21,7 @@ $flashMessage = $_SESSION['flash']      ?? '';
 $flashType    = $_SESSION['flash_type'] ?? 'success';
 unset($_SESSION['flash'], $_SESSION['flash_type']);
 
-/** Helper to generate and email a fresh 4-digit OTP for password reset. */
+/** Generates and emails a fresh 4-digit OTP for password reset. */
 function issueForgotOtp(array $user): array
 {
     $otpCode = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
@@ -35,6 +32,7 @@ function issueForgotOtp(array $user): array
         'code_hash'           => hash('sha256', $otpCode),
         'expires_at'          => time() + 600,
         'resend_available_at' => time() + 10,
+        'verified'            => false,
     ];
 
     $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8');
@@ -42,7 +40,7 @@ function issueForgotOtp(array $user): array
 <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#32292f;color:#f0f7f4;border-radius:12px;">
   <h2 style="margin:0 0 12px;color:#99e1d9;">Your Cine password reset OTP</h2>
   <p style="margin:0 0 14px;line-height:1.6;">Hi {$safeName},</p>
-  <p style="margin:0 0 18px;line-height:1.6;">Use this 4-digit OTP code to reset your Cine password (valid for 10 minutes):</p>
+  <p style="margin:0 0 18px;line-height:1.6;">Use this 4-digit OTP code to verify your identity (valid for 10 minutes):</p>
   <div style="font-size:32px;font-weight:bold;letter-spacing:10px;text-align:center;padding:16px;background:rgba(153,225,217,0.14);border:1px solid rgba(153,225,217,0.35);border-radius:10px;color:#99e1d9;margin-bottom:18px;">{$otpCode}</div>
   <p style="margin:0;font-size:12px;color:#b5b5b5;">If you did not request this code, please ignore this email.</p>
 </div>
@@ -102,17 +100,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'verify_otp') {
-        $otpData         = $_SESSION['forgot_otp'] ?? null;
-        $otpInput        = trim($_POST['otp_code'] ?? '');
-        $newPassword     = $_POST['new_password'] ?? '';
-        $confirmPassword = $_POST['confirm_password'] ?? '';
+        $otpData  = $_SESSION['forgot_otp'] ?? null;
+        $otpInput = trim($_POST['otp_code'] ?? '');
 
         if (!$otpData || time() > (int)$otpData['expires_at']) {
             unset($_SESSION['forgot_otp']);
             $flashMessage = 'Your OTP has expired. Please enter your email again.';
             $flashType    = 'error';
         } elseif (!preg_match('/^\d{4}$/', $otpInput) || !hash_equals($otpData['code_hash'], hash('sha256', $otpInput))) {
-            // Wrong OTP: immediately issue a fresh 4-digit OTP and reset the 10s timer
             $mailResult = issueForgotOtp([
                 'id'       => $otpData['user_id'],
                 'email'    => $otpData['email'],
@@ -122,6 +117,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ? 'Incorrect OTP! A new 4-digit OTP has been sent to ' . $otpData['email'] . '.'
                 : 'Incorrect OTP, and could not resend new OTP: ' . $mailResult['error'];
             $flashType = 'error';
+        } else {
+            $_SESSION['forgot_otp']['verified'] = true;
+            $_SESSION['flash']                  = 'OTP verified! Please enter your new password.';
+            $_SESSION['flash_type']             = 'success';
+            header('Location: forgot_password.php');
+            exit;
+        }
+    } elseif ($action === 'set_password') {
+        $otpData         = $_SESSION['forgot_otp'] ?? null;
+        $newPassword     = $_POST['new_password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
+
+        if (!$otpData || empty($otpData['verified']) || time() > (int)$otpData['expires_at']) {
+            unset($_SESSION['forgot_otp']);
+            $flashMessage = 'Your session expired. Please request a new OTP.';
+            $flashType    = 'error';
         } elseif (strlen($newPassword) < 6) {
             $flashMessage = 'Password must be at least 6 characters.';
             $flashType    = 'error';
@@ -132,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $repo = new UserRepository();
             $repo->updatePassword((int)$otpData['user_id'], $newPassword);
             unset($_SESSION['forgot_otp']);
-            $_SESSION['flash']      = 'Password reset successful! You can now log in with your new password.';
+            $_SESSION['flash']      = 'Password reset successful! You can now log in.';
             $_SESSION['flash_type'] = 'success';
             header('Location: loginUser.php');
             exit;
@@ -141,7 +152,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $otpSession      = $_SESSION['forgot_otp'] ?? null;
-$otpPending      = is_array($otpSession) && time() <= (int)($otpSession['expires_at'] ?? 0);
+$otpActive       = is_array($otpSession) && time() <= (int)($otpSession['expires_at'] ?? 0);
+$otpVerified     = $otpActive && !empty($otpSession['verified']);
+$otpPending      = $otpActive && !$otpVerified;
 $resendRemaining = $otpPending ? max(0, (int)($otpSession['resend_available_at'] ?? 0) - time()) : 0;
 
 ob_start();

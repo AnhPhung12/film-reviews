@@ -61,7 +61,7 @@
             <div class="profile-eyebrow">SECURITY</div>
             <h2 class="avatar-picker-title">Change password</h2>
 
-            <?php if (!$otpPending): ?>
+            <?php if (!$otpPending && empty($otpVerified)): ?>
                 <!-- Step 1: Request 4-digit email OTP -->
                 <p class="profile-intro">
                     We will send a four-digit verification code to <strong style="color:var(--text)"><?= htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong> before allowing a password change.
@@ -69,21 +69,101 @@
                 <form method="post" action="settings.php">
                     <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['settings_token'], ENT_QUOTES, 'UTF-8') ?>">
                     <div class="profile-card-actions">
-                        <button class="btn btn-ghost" type="submit" name="action" value="send_otp">Send security code</button>
+                        <button class="btn btn-primary" type="submit" name="action" value="send_otp" style="border-radius:999px;">Send security code</button>
                     </div>
                 </form>
+            <?php elseif ($otpPending): ?>
+                <!-- Step 2: 4-Box OTP Verification UI -->
+                <h3 style="margin:0 0 0.4rem;font-size:1.15rem;font-weight:700;">OTP verification</h3>
+                <p class="profile-intro" style="margin-bottom:1.25rem;">
+                    Please enter the OTP (One-Time Password) sent to <strong style="color:var(--text)"><?= htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong> to complete your verification.
+                </p>
+                <form method="post" action="settings.php" id="settingsOtpForm">
+                    <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['settings_token'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="otp_code" id="settingsOtpHidden" value="">
+
+                    <div style="display:flex;justify-content:center;gap:0.75rem;margin-bottom:1.1rem;">
+                        <?php for ($i = 0; $i < 4; $i++): ?>
+                            <input type="text" inputmode="numeric" maxlength="1" pattern="\d"
+                                class="form-input otp-digit-box"
+                                aria-label="OTP digit <?= $i + 1 ?>"
+                                autocomplete="<?= $i === 0 ? 'one-time-code' : 'off' ?>"
+                                style="width:52px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;border-radius:12px;padding:0;">
+                        <?php endfor; ?>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;color:var(--text-dim);margin-bottom:1.25rem;gap:0.5rem;flex-wrap:wrap;">
+                        <span>Remaining time: <strong id="settingsCountdownText" style="color:var(--gold);font-variant-numeric:tabular-nums;">00:<?= str_pad((string)(int)($settingsResendRemaining ?? 0), 2, '0', STR_PAD_LEFT) ?>s</strong></span>
+                        <span>
+                            Didn't get the code?
+                            <button type="submit" name="action" value="send_otp" formnovalidate id="settingsResendBtn"
+                                style="background:none;border:none;padding:0;font-size:0.82rem;font-weight:700;cursor:<?= !empty($settingsResendRemaining) ? 'not-allowed' : 'pointer' ?>;color:<?= !empty($settingsResendRemaining) ? 'var(--text-dim)' : 'var(--gold)' ?>;opacity:<?= !empty($settingsResendRemaining) ? '0.55' : '1' ?>;"
+                                <?= !empty($settingsResendRemaining) ? 'disabled' : '' ?>>Resend</button>
+                        </span>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:0.65rem;">
+                        <button class="btn btn-primary" type="submit" name="action" value="verify_otp" style="width:100%;justify-content:center;border-radius:999px;padding:0.75rem 1rem;">Verify</button>
+                        <button class="btn btn-ghost" type="submit" name="action" value="cancel_otp" formnovalidate style="width:100%;justify-content:center;border-radius:999px;padding:0.75rem 1rem;">Cancel</button>
+                    </div>
+                </form>
+                <script>
+                (function () {
+                    var boxes = Array.prototype.slice.call(document.querySelectorAll('#settingsOtpForm .otp-digit-box'));
+                    var hidden = document.getElementById('settingsOtpHidden');
+                    var form = document.getElementById('settingsOtpForm');
+                    function sync() {
+                        hidden.value = boxes.map(function (b) { return b.value.replace(/\D/g, ''); }).join('');
+                    }
+                    boxes.forEach(function (box, idx) {
+                        box.addEventListener('input', function () {
+                            box.value = box.value.replace(/\D/g, '').slice(-1);
+                            sync();
+                            if (box.value && idx < boxes.length - 1) boxes[idx + 1].focus();
+                        });
+                        box.addEventListener('keydown', function (e) {
+                            if (e.key === 'Backspace' && !box.value && idx > 0) boxes[idx - 1].focus();
+                        });
+                        box.addEventListener('paste', function (e) {
+                            var txt = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 4);
+                            if (!txt) return;
+                            e.preventDefault();
+                            txt.split('').forEach(function (ch, j) { if (boxes[j]) boxes[j].value = ch; });
+                            sync();
+                            if (boxes[Math.min(txt.length, 3)]) boxes[Math.min(txt.length, 3)].focus();
+                        });
+                    });
+                    if (boxes[0]) boxes[0].focus();
+                    form.addEventListener('submit', sync);
+
+                    var btn = document.getElementById('settingsResendBtn');
+                    var cdText = document.getElementById('settingsCountdownText');
+                    var remaining = <?= (int)($settingsResendRemaining ?? 0) ?>;
+                    if (remaining > 0 && btn && cdText) {
+                        var timer = setInterval(function () {
+                            remaining -= 1;
+                            if (remaining <= 0) {
+                                clearInterval(timer);
+                                cdText.textContent = '00:00s';
+                                btn.disabled = false;
+                                btn.style.cursor = 'pointer';
+                                btn.style.color = 'var(--gold)';
+                                btn.style.opacity = '1';
+                            } else {
+                                cdText.textContent = '00:' + (remaining < 10 ? '0' : '') + remaining + 's';
+                            }
+                        }, 1000);
+                    }
+                })();
+                </script>
             <?php else: ?>
-                <!-- Step 2: Verify OTP and submit new password -->
+                <!-- Step 3: Set New Password (strictly >= 6 chars) -->
                 <p class="profile-intro">
-                    Enter the 4-digit verification code sent to <strong style="color:var(--text)"><?= htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong> and choose your new password.
+                    OTP verified! Enter your new password (minimum 6 characters).
                 </p>
                 <form method="post" action="settings.php">
                     <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['settings_token'], ENT_QUOTES, 'UTF-8') ?>">
                     <div class="form-grid">
-                        <div class="form-group full">
-                            <label class="form-label" for="otp_code">4-digit security code</label>
-                            <input class="form-input otp-input" id="otp_code" name="otp_code" maxlength="4" pattern="\d{4}" inputmode="numeric" required placeholder="••••" autocomplete="one-time-code">
-                        </div>
                         <div class="form-group full">
                             <label class="form-label" for="new_password">New password</label>
                             <input class="form-input" id="new_password" type="password" name="new_password" minlength="6" required autocomplete="new-password" placeholder="At least 6 characters">
@@ -93,31 +173,11 @@
                             <input class="form-input" id="confirm_password" type="password" name="confirm_password" minlength="6" required autocomplete="new-password" placeholder="Re-enter new password">
                         </div>
                     </div>
-                    <div class="profile-card-actions profile-otp-actions">
-                        <button class="btn btn-primary" type="submit" name="action" value="verify_change_password">Verify &amp; update</button>
-                        <button class="btn btn-ghost" type="submit" name="action" value="send_otp" formnovalidate id="settingsResendBtn" <?= !empty($settingsResendRemaining) ? 'disabled' : '' ?>>
-                            <?= !empty($settingsResendRemaining) ? 'Resend code (' . (int)$settingsResendRemaining . 's)' : 'Resend code' ?>
-                        </button>
-                        <button class="btn-reset-avatar" type="submit" name="action" value="cancel_otp" formnovalidate>Cancel</button>
+                    <div style="display:flex;flex-direction:column;gap:0.65rem;margin-top:1.25rem;">
+                        <button class="btn btn-primary" type="submit" name="action" value="verify_change_password" style="width:100%;justify-content:center;border-radius:999px;padding:0.75rem 1rem;">Update password</button>
+                        <button class="btn btn-ghost" type="submit" name="action" value="cancel_otp" formnovalidate style="width:100%;justify-content:center;border-radius:999px;padding:0.75rem 1rem;">Cancel</button>
                     </div>
                 </form>
-                <script>
-                (function () {
-                    var btn = document.getElementById('settingsResendBtn');
-                    var remaining = <?= (int)($settingsResendRemaining ?? 0) ?>;
-                    if (!btn || remaining <= 0) return;
-                    var timer = setInterval(function () {
-                        remaining -= 1;
-                        if (remaining <= 0) {
-                            clearInterval(timer);
-                            btn.disabled = false;
-                            btn.textContent = 'Resend code';
-                        } else {
-                            btn.textContent = 'Resend code (' + remaining + 's)';
-                        }
-                    }, 1000);
-                })();
-                </script>
             <?php endif; ?>
         </div>
     </div>
