@@ -212,11 +212,17 @@ class Mailer
             ],
         ]);
         $response = @file_get_contents($url, false, $ctx);
-        $statusLine = $http_response_header[0] ?? '';
-        $code = preg_match('/\s(\d{3})\s/', $statusLine, $m) ? (int)$m[1] : 0;
-        if ($response !== false && $code >= 200 && $code < 300) {
+        $code = 0;
+        foreach ($http_response_header ?? [] as $hdrLine) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})\b/i', $hdrLine, $m)) {
+                $code = (int)$m[1]; // Keep the final HTTP status code after any 302 redirects (e.g. Google Apps Script)
+            }
+        }
+        $decoded = is_string($response) ? json_decode($response, true) : null;
+        if ($response !== false && (($code >= 200 && $code < 300) || (!empty($decoded['ok'])))) {
             return ['ok' => true, 'error' => ''];
         }
+        $statusLine = $http_response_header[0] ?? '';
         $detail = is_string($response) && $response !== '' ? trim(strip_tags($response)) : $statusLine;
         return ['ok' => false, 'error' => 'Mail API error (' . $code . '): ' . mb_substr($detail, 0, 200)];
     }
