@@ -3767,3 +3767,35 @@ a.pagination-link:hover {
 }
 
 
+
+/* ── PASSWORD VISIBILITY TOGGLE ─────────────────── */
+.pw-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.pw-wrap .form-input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+.pw-toggle {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.pw-toggle:hover {
+  color: var(--gold);
+  background: rgba(255, 255, 255, 0.06);
+}
