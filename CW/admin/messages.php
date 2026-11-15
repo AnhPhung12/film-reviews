@@ -61,7 +61,7 @@ ob_start(); // Begin output buffering to capture table HTML for admin/layout.php
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th>#</th>
                         <th>Sender</th>
                         <th>Email</th>
                         <th>Subject</th>
@@ -71,10 +71,10 @@ ob_start(); // Begin output buffering to capture table HTML for admin/layout.php
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($messages as $msg): ?>
+                    <?php foreach ($messages as $idx => $msg): ?>
                         <tr>
                             <td class="mono dim" style="font-size:.78rem">
-                                <?= $msg['id'] ?>
+                                <?= $idx + 1 ?>
                             </td>
 
                             <td style="font-weight:600">

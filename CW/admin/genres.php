@@ -164,7 +164,7 @@ ob_start(); // Start output buffering to capture genres management view
         <table>
             <thead>
                 <tr>
-                    <th style="width:60px">ID</th>
+                    <th style="width:60px">#</th>
                     <th>Genre Name</th>
                     <th>Description</th>
                     <th style="width:130px;text-align:center">Assigned Films</th>
@@ -177,11 +177,11 @@ ob_start(); // Start output buffering to capture genres management view
                         <td colspan="5" class="empty-state">No genres found in the database.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($genres as $g):
+                    <?php foreach ($genres as $idx => $g):
                         $fCount = (int)($g['film_count'] ?? 0);
                     ?>
                         <tr>
-                            <td class="dim">#<?= (int)$g['id'] ?></td>
+                            <td class="dim"><?= $idx + 1 ?></td>
                             <td>
                                 <strong style="color:var(--text);font-size:0.95rem">
                                     <?= htmlspecialchars($g['name']) ?>

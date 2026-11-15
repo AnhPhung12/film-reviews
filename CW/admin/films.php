@@ -293,7 +293,7 @@ ob_start(); // Begin output buffering to capture films management view
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>#</th>
                     <th>Poster</th>
                     <th>Title</th>
                     <th>Country</th>
@@ -311,10 +311,10 @@ ob_start(); // Begin output buffering to capture films management view
                         <td colspan="10">No films found in directory.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($films as $f): ?>
+                    <?php foreach ($films as $idx => $f): ?>
                         <tr style="<?= ($editFilm && $editFilm['id'] == $f['id']) ? 'background:var(--glass-hover)' : '' ?>">
-                            <!-- ID -->
-                            <td class="mono dim" style="font-size:0.78rem"><?= $f['id'] ?></td>
+                            <!-- Row number -->
+                            <td class="mono dim" style="font-size:0.78rem"><?= $offset + $idx + 1 ?></td>
 
                             <!-- Poster -->
                             <td>

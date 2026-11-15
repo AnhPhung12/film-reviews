@@ -127,7 +127,7 @@ ob_start(); // Start output buffering to capture reviewers table HTML
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>#</th>
                     <th>Name</th>
                     <th>Avatar</th>
                     <th>Email</th>
@@ -145,9 +145,9 @@ ob_start(); // Start output buffering to capture reviewers table HTML
                         <td colspan="10">No reviewers found.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($reviewers as $rv): ?>
+                    <?php foreach ($reviewers as $idx => $rv): ?>
                         <tr>
-                            <td class="mono dim" style="font-size:0.78rem"><?= (int)$rv['id'] ?></td>
+                            <td class="mono dim" style="font-size:0.78rem"><?= $idx + 1 ?></td>
                             <td>
                                 <div style="font-weight:600"><?= htmlspecialchars($rv['fullname']) ?></div>
                             </td>
