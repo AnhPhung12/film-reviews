@@ -78,6 +78,11 @@
                 <p class="profile-intro" style="margin-bottom:1.25rem;">
                     Please enter the OTP (One-Time Password) sent to <strong style="color:var(--text)"><?= htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong> to complete your verification.
                 </p>
+                <?php if (!empty($_SESSION['pwd_otp']['local_otp'])): ?>
+                    <div style="margin-bottom:1.1rem;padding:0.75rem 1rem;border-radius:10px;background:rgba(153,225,217,0.12);border:1px solid rgba(153,225,217,0.35);color:var(--gold);font-size:0.86rem;text-align:center;">
+                        Local Test Mode (mail not configured) — Your OTP: <strong style="font-size:1.05rem;letter-spacing:3px;"><?= htmlspecialchars($_SESSION['pwd_otp']['local_otp'], ENT_QUOTES, 'UTF-8') ?></strong>
+                    </div>
+                <?php endif; ?>
                 <form method="post" action="settings.php" id="settingsOtpForm">
                     <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['settings_token'], ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="otp_code" id="settingsOtpHidden" value="">

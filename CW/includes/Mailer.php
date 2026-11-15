@@ -27,7 +27,7 @@ class Mailer
     /** Returns true only on localhost when no mail transport is configured. */
     public static function isLocalDevFallback(): bool
     {
-        if (self::isConfigured() || trim((string)ini_get('sendmail_path')) !== '') {
+        if (self::isConfigured()) {
             return false;
         }
         $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));

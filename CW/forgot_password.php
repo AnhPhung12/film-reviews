@@ -25,6 +25,7 @@ unset($_SESSION['flash'], $_SESSION['flash_type']);
 function issueForgotOtp(array $user): array
 {
     $otpCode = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+    $isLocalFallback = Mailer::isLocalDevFallback();
     $_SESSION['forgot_otp'] = [
         'user_id'             => (int)$user['id'],
         'email'               => $user['email'],
@@ -33,6 +34,7 @@ function issueForgotOtp(array $user): array
         'expires_at'          => time() + 600,
         'resend_available_at' => time() + 40,
         'verified'            => false,
+        'local_otp'           => $isLocalFallback ? $otpCode : null,
     ];
 
     $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8');

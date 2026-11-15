@@ -88,6 +88,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') { // Process form actions on 
                 'resend_available_at' => time() + 40, // Enforce 40-second resend cooldown
                 'verified'            => false, // Require Step 2 OTP verification before password entry
                 'attempts'            => 0, // Initialize failed verification attempt counter
+                'local_otp'           => Mailer::isLocalDevFallback() ? $otpCode : null,
             ];
 
             $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8'); // Escape user name for HTML email
@@ -138,6 +139,7 @@ HTML; // End heredoc HTML OTP email body
                 'resend_available_at' => time() + 40,
                 'verified'            => false,
                 'attempts'            => 0,
+                'local_otp'           => Mailer::isLocalDevFallback() ? $newOtp : null,
             ];
             $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8');
             $htmlBody = "<div style=\"font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#32292f;color:#f0f7f4;border-radius:12px;\">"

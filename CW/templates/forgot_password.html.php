@@ -46,6 +46,12 @@
             Please enter the OTP (One-Time Password) sent to <strong style="color: var(--text);"><?= htmlspecialchars($otpSession['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong> to complete your verification.
         </p>
 
+        <?php if (!empty($otpSession['local_otp'])): ?>
+            <div style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 10px; background: rgba(153, 225, 217, 0.12); border: 1px solid rgba(153, 225, 217, 0.35); color: var(--gold); font-size: 0.88rem; text-align: center;">
+                Local Test Mode (mail not configured) — Your OTP: <strong style="font-size: 1.05rem; letter-spacing: 3px;"><?= htmlspecialchars($otpSession['local_otp'], ENT_QUOTES, 'UTF-8') ?></strong>
+            </div>
+        <?php endif; ?>
+
         <form method="POST" action="forgot_password.php" id="forgotOtpForm">
             <input type="hidden" name="otp_code" id="forgotOtpHidden" value="">
 
