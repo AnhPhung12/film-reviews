@@ -170,7 +170,8 @@
                     <a href="film.php?id=<?= $rev['film_id'] ?>" class="review-film-link">
                         🎬 <?= htmlspecialchars($rev['film_title']) ?>
                     </a>
-                    <p class="review-text"><?= nl2br(htmlspecialchars(mb_substr($rev['text'], 0, 200))) ?><?= mb_strlen($rev['text']) > 200 ? '…' : '' ?></p>
+                    <?php $plainReview = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags((string)$rev['text']), ENT_QUOTES, 'UTF-8'))); ?>
+                    <p class="review-text"><?= htmlspecialchars(mb_substr($plainReview, 0, 200), ENT_QUOTES, 'UTF-8') ?><?= mb_strlen($plainReview) > 200 ? '…' : '' ?></p>
                 </article>
             <?php endforeach; ?>
         </div>

@@ -251,9 +251,10 @@ ob_start(); // Begin output buffering to capture reviews table HTML
                                 <span class="mono dim" style="font-size:0.72rem"> (<?= $r['rating'] ?>)</span>
                             </td>
 
-                            <!-- Review text preview (truncated to 90 characters) -->
+                            <!-- Review text preview (strip HTML tags, truncated to 90 characters) -->
                             <td style="max-width:200px;font-size:0.82rem;color:var(--text-dim)">
-                                <?= htmlspecialchars(mb_substr($r['text'], 0, 90)) ?><?= mb_strlen($r['text']) > 90 ? '…' : '' ?>
+                                <?php $plainPreview = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags((string)$r['text']), ENT_QUOTES, 'UTF-8'))); ?>
+                                <?= htmlspecialchars(mb_substr($plainPreview, 0, 90), ENT_QUOTES, 'UTF-8') ?><?= mb_strlen($plainPreview) > 90 ? '…' : '' ?>
                             </td>
 
                             <!-- Date & Time -->
