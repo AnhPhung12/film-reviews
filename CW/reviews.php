@@ -32,7 +32,7 @@ $limit           = 6; // 6 reviews per page
 
 // Fetch genres, countries, and matching films for sidebar/filter controls
 $genres    = $genreCtrl->listAll(); // Load all genres for filter chips/dropdown
-$countries = $filmCtrl->listCountries(); // Load distinct film countries for dropdown
+$countries = $filmCtrl->getCountries(); // Load distinct film countries for dropdown
 $films     = $filmCtrl->listFiltered($search, $selectedGenre, $selectedCountry); // Fetch films matching current search/genre/country
 
 // Resolve selected genre record for display heading if filtered
