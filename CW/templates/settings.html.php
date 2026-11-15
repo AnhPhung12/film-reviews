@@ -95,10 +95,29 @@
                     </div>
                     <div class="profile-card-actions profile-otp-actions">
                         <button class="btn btn-primary" type="submit" name="action" value="verify_change_password">Verify &amp; update</button>
-                        <button class="btn btn-ghost" type="submit" name="action" value="send_otp" formnovalidate>Resend code</button>
+                        <button class="btn btn-ghost" type="submit" name="action" value="send_otp" formnovalidate id="settingsResendBtn" <?= !empty($settingsResendRemaining) ? 'disabled' : '' ?>>
+                            <?= !empty($settingsResendRemaining) ? 'Resend code (' . (int)$settingsResendRemaining . 's)' : 'Resend code' ?>
+                        </button>
                         <button class="btn-reset-avatar" type="submit" name="action" value="cancel_otp" formnovalidate>Cancel</button>
                     </div>
                 </form>
+                <script>
+                (function () {
+                    var btn = document.getElementById('settingsResendBtn');
+                    var remaining = <?= (int)($settingsResendRemaining ?? 0) ?>;
+                    if (!btn || remaining <= 0) return;
+                    var timer = setInterval(function () {
+                        remaining -= 1;
+                        if (remaining <= 0) {
+                            clearInterval(timer);
+                            btn.disabled = false;
+                            btn.textContent = 'Resend code';
+                        } else {
+                            btn.textContent = 'Resend code (' + remaining + 's)';
+                        }
+                    }, 1000);
+                })();
+                </script>
             <?php endif; ?>
         </div>
     </div>

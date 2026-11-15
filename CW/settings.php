@@ -71,17 +71,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') { // Process form actions on 
         header('Location: settings.php'); // Redirect back to settings page (PRG)
         exit; // Stop execution
     } elseif ($action === 'send_otp') { // Generate and email a 4-digit OTP for password change
-        // Generate and email a 4-digit OTP for password change verification
-        if (!Mailer::isConfigured() && trim((string)ini_get('sendmail_path')) === '') { // Check SMTP or sendmail availability
+        $existingOtp = $_SESSION['pwd_otp'] ?? null;
+        if (is_array($existingOtp) && (int)($existingOtp['user_id'] ?? 0) === (int)$user['id'] && time() < (int)($existingOtp['resend_available_at'] ?? 0)) {
+            $wait = (int)$existingOtp['resend_available_at'] - time();
+            $flashMessage = "Please wait {$wait}s before requesting a new security code.";
+            $flashType    = 'error';
+        } elseif (!Mailer::isConfigured() && trim((string)ini_get('sendmail_path')) === '') { // Check SMTP or sendmail availability
             $flashMessage = 'Email sending is not configured yet. Please set your SMTP credentials in CW/includes/mail_config.php.'; // Report missing mail config
             $flashType    = 'error'; // Style alert as error
         } else {
             $otpCode             = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT); // Generate cryptographically random 4-digit OTP
             $_SESSION['pwd_otp'] = [ // Store hashed OTP and metadata in session
-                'user_id'    => (int)$user['id'], // Bind OTP to current user ID
-                'code_hash'  => hash('sha256', $otpCode), // Store SHA-256 hash instead of plaintext code
-                'expires_at' => time() + 600, // Set 10-minute expiration timestamp
-                'attempts'   => 0, // Initialize failed verification attempt counter
+                'user_id'             => (int)$user['id'], // Bind OTP to current user ID
+                'code_hash'           => hash('sha256', $otpCode), // Store SHA-256 hash instead of plaintext code
+                'expires_at'          => time() + 600, // Set 10-minute expiration timestamp
+                'resend_available_at' => time() + 10, // Enforce 10-second resend cooldown
+                'attempts'            => 0, // Initialize failed verification attempt counter
             ];
 
             $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8'); // Escape user name for HTML email
@@ -123,13 +128,27 @@ HTML; // End heredoc HTML OTP email body
             $flashMessage = 'Your security code has expired. Please request a new code.'; // Inform user of expiry
             $flashType    = 'error'; // Style alert as error
         } elseif (!preg_match('/^\d{4}$/', $otpInput) || !hash_equals($otpData['code_hash'], hash('sha256', $otpInput))) { // Constant-time OTP hash comparison
-            $_SESSION['pwd_otp']['attempts'] = ((int)$otpData['attempts']) + 1; // Increment failed attempt counter
-            if ($_SESSION['pwd_otp']['attempts'] >= 5) { // Lock out after 5 wrong guesses to prevent brute-force
-                unset($_SESSION['pwd_otp']); // Invalidate OTP after max attempts
-                $flashMessage = 'Too many incorrect attempts. Please request a new security code.'; // Inform user of lockout
-            } else {
-                $flashMessage = 'Invalid 4-digit security code. Please check your email and try again.'; // Prompt user to retry
-            }
+            // Incorrect OTP: automatically issue & email a fresh 4-digit OTP and restart 10s timer
+            $newOtp = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $_SESSION['pwd_otp'] = [
+                'user_id'             => (int)$user['id'],
+                'code_hash'           => hash('sha256', $newOtp),
+                'expires_at'          => time() + 600,
+                'resend_available_at' => time() + 10,
+                'attempts'            => 0,
+            ];
+            $safeName = htmlspecialchars($user['fullname'], ENT_QUOTES, 'UTF-8');
+            $htmlBody = "<div style=\"font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#32292f;color:#f0f7f4;border-radius:12px;\">"
+                . "<h2 style=\"margin:0 0 12px;color:#99e1d9;\">Your new Cine security code</h2>"
+                . "<p style=\"margin:0 0 14px;line-height:1.6;\">Hi {$safeName},</p>"
+                . "<p style=\"margin:0 0 18px;line-height:1.6;\">Your previous code did not match. Here is your new 4-digit security code:</p>"
+                . "<div style=\"font-size:32px;font-weight:bold;letter-spacing:10px;text-align:center;padding:16px;background:rgba(153,225,217,0.14);border:1px solid rgba(153,225,217,0.35);border-radius:10px;color:#99e1d9;margin-bottom:18px;\">{$newOtp}</div>"
+                . "</div>";
+            $textBody = "Hi {$user['fullname']},\n\nYour new 4-digit Cine security code is: {$newOtp}\nThis code expires in 10 minutes.";
+            $retryMail = Mailer::send($user['email'], $user['fullname'], 'Your new Cine password security code', $htmlBody, $textBody);
+            $flashMessage = $retryMail['ok']
+                ? 'Invalid 4-digit code! A new OTP has been sent to ' . $user['email'] . '.'
+                : 'Invalid 4-digit code, and could not resend new OTP: ' . $retryMail['error'];
             $flashType = 'error'; // Style alert as error
         } elseif (strlen($newPassword) < 6) { // Enforce minimum 6-character password length
             $flashMessage = 'New password must contain at least 6 characters.'; // Set length error
@@ -179,6 +198,7 @@ $otpPending = !empty($_SESSION['pwd_otp']) // Check if OTP session data exists, 
 if (!$otpPending && isset($_SESSION['pwd_otp'])) { // Clean up expired OTP data if still in session
     unset($_SESSION['pwd_otp']); // Remove stale OTP array
 }
+$settingsResendRemaining = $otpPending ? max(0, (int)($_SESSION['pwd_otp']['resend_available_at'] ?? 0) - time()) : 0;
 
 // Retrieve one-time flash message from session if none set during POST
 if (empty($flashMessage)) { // Only read session flash when no inline error was set
