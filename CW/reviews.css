@@ -154,6 +154,8 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .brand-icon {
   display: grid;
@@ -198,13 +200,26 @@ button {
   list-style: none;
 }
 .nav-link {
-  padding: 0.45rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  padding: 0.45rem 0.9rem;
   border-radius: 8px;
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--text-dim);
   transition: all 0.2s;
   letter-spacing: 0.02em;
+}
+@media (max-width: 1120px) {
+  .nav-link {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.82rem;
+  }
+  .nav-cta {
+    padding: 0.4rem 0.85rem;
+  }
 }
 .nav-link:hover,
 .nav-link.active {

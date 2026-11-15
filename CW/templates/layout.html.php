@@ -44,7 +44,7 @@ if (!empty($_SESSION['user_id'])) { // Only check when a user is logged in
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="icons/logo.png">
     <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-    <link rel="stylesheet" href="reviews.css?v=19">
+    <link rel="stylesheet" href="reviews.css?v=20">
 </head>
 
 <body>
