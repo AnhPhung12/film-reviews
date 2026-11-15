@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y libpng-dev libjpeg-dev libwebp-dev libf
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
-COPY CW /var/www/html/COMP1841/CW
-RUN printf '<?php header("Location: /COMP1841/CW/"); exit;\n' > /var/www/html/index.php
-RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
+COPY CW /var/www/html
+
+ENV PORT=80
+RUN printf 'Listen ${PORT}\n' > /etc/apache2/ports.conf \
+    && printf '<VirtualHost *:${PORT}>\n\tDocumentRoot /var/www/html\n\t<Directory /var/www/html>\n\t\tAllowOverride All\n\t\tRequire all granted\n\t</Directory>\n\tErrorLog ${APACHE_LOG_DIR}/error.log\n\tCustomLog ${APACHE_LOG_DIR}/access.log combined\n</VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
