@@ -174,9 +174,9 @@ ob_start(); // Begin output buffering to capture reviews table HTML
             <span class="badge badge-gray"><?= count($reviews) ?></span>
         </div>
     </div>
-    <div class="table-wrap">
-        <table>
-            <thead>
+    <div class="table-wrap" id="adminReviewsScroll" style="overflow-x:auto;overflow-y:auto;max-height:380px;">
+        <table style="min-width:960px;">
+            <thead style="position:sticky;top:0;z-index:5;background:rgba(36,28,34,0.96);backdrop-filter:blur(8px);">
                 <tr>
                     <th>Reviewer</th>
                     <th>
@@ -283,7 +283,48 @@ ob_start(); // Begin output buffering to capture reviews table HTML
             </tbody>
         </table>
     </div>
+    <?php if (count($reviews) > 6): ?>
+        <div id="adminReviewsScrollStatus" style="padding:0.75rem 1.25rem;border-top:1px solid var(--border);font-size:0.78rem;color:var(--text-dim);display:flex;justify-content:space-between;align-items:center;">
+            <span>Showing <strong id="adminReviewsShownCount">6</strong> of <strong><?= count($reviews) ?></strong> reviews</span>
+            <span id="adminReviewsScrollHint">Scroll down to load 6 more…</span>
+        </div>
+    <?php endif; ?>
 </div>
+
+<script>
+(function () {
+    var wrap = document.getElementById('adminReviewsScroll');
+    if (!wrap) return;
+    var rows = Array.prototype.slice.call(wrap.querySelectorAll('tbody tr:not(.empty-row)'));
+    var batchSize = 6;
+    var shown = Math.min(batchSize, rows.length);
+    var countEl = document.getElementById('adminReviewsShownCount');
+    var hintEl  = document.getElementById('adminReviewsScrollHint');
+
+    function applyVisibility() {
+        rows.forEach(function (tr, idx) {
+            tr.style.display = idx < shown ? '' : 'none';
+        });
+        if (countEl) countEl.textContent = String(shown);
+        if (hintEl) {
+            hintEl.textContent = shown >= rows.length
+                ? 'All ' + rows.length + ' reviews loaded'
+                : 'Scroll down to load 6 more…';
+        }
+    }
+
+    if (rows.length > batchSize) {
+        applyVisibility();
+        wrap.addEventListener('scroll', function () {
+            if (shown >= rows.length) return;
+            if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 24) {
+                shown = Math.min(rows.length, shown + batchSize);
+                applyVisibility();
+            }
+        });
+    }
+})();
+</script>
 
 <?php
 $content = ob_get_clean(); // Capture buffered reviews HTML into $content
