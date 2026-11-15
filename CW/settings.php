@@ -85,7 +85,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') { // Process form actions on 
                 'user_id'             => (int)$user['id'], // Bind OTP to current user ID
                 'code_hash'           => hash('sha256', $otpCode), // Store SHA-256 hash instead of plaintext code
                 'expires_at'          => time() + 600, // Set 10-minute expiration timestamp
-                'resend_available_at' => time() + 10, // Enforce 10-second resend cooldown
+                'resend_available_at' => time() + 40, // Enforce 40-second resend cooldown
                 'verified'            => false, // Require Step 2 OTP verification before password entry
                 'attempts'            => 0, // Initialize failed verification attempt counter
             ];
@@ -131,7 +131,7 @@ HTML; // End heredoc HTML OTP email body
                 'user_id'             => (int)$user['id'],
                 'code_hash'           => hash('sha256', $newOtp),
                 'expires_at'          => time() + 600,
-                'resend_available_at' => time() + 10,
+                'resend_available_at' => time() + 40,
                 'verified'            => false,
                 'attempts'            => 0,
             ];
@@ -169,6 +169,9 @@ HTML; // End heredoc HTML OTP email body
             $flashType    = 'error'; // Style alert as error
         } elseif ($newPassword !== $confirmPassword) { // Verify password confirmation matches
             $flashMessage = 'New password and confirmation do not match.'; // Set mismatch error
+            $flashType    = 'error'; // Style alert as error
+        } elseif ($repository->verifyPassword((int)$user['id'], $newPassword)) { // Reject reusing current password
+            $flashMessage = 'This is your current password. Please enter a new password.'; // Prompt for a different password
             $flashType    = 'error'; // Style alert as error
         } else {
             $repository->updatePassword((int)$user['id'], $newPassword); // Hash and save new password in DB

@@ -31,7 +31,7 @@ function issueForgotOtp(array $user): array
         'fullname'            => $user['fullname'],
         'code_hash'           => hash('sha256', $otpCode),
         'expires_at'          => time() + 600,
-        'resend_available_at' => time() + 10,
+        'resend_available_at' => time() + 40,
         'verified'            => false,
     ];
 
@@ -141,12 +141,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $flashType    = 'error';
         } else {
             $repo = new UserRepository();
-            $repo->updatePassword((int)$otpData['user_id'], $newPassword);
-            unset($_SESSION['forgot_otp']);
-            $_SESSION['flash']      = 'Password reset successful! You can now log in.';
-            $_SESSION['flash_type'] = 'success';
-            header('Location: loginUser.php');
-            exit;
+            if ($repo->verifyPassword((int)$otpData['user_id'], $newPassword)) {
+                $flashMessage = 'This is your current password. Please enter a new password.';
+                $flashType    = 'error';
+            } else {
+                $repo->updatePassword((int)$otpData['user_id'], $newPassword);
+                unset($_SESSION['forgot_otp']);
+                $_SESSION['flash']      = 'Password reset successful! You can now log in.';
+                $_SESSION['flash_type'] = 'success';
+                header('Location: loginUser.php');
+                exit;
+            }
         }
     }
 }
