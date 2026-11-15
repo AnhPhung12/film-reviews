@@ -76,7 +76,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') { // Process form actions on 
             $wait = (int)$existingOtp['resend_available_at'] - time();
             $flashMessage = "Please wait {$wait}s before requesting a new security code.";
             $flashType    = 'error';
-        } elseif (!Mailer::isConfigured() && trim((string)ini_get('sendmail_path')) === '') { // Check SMTP or sendmail availability
+        } elseif (!Mailer::isConfigured() && trim((string)ini_get('sendmail_path')) === '' && !Mailer::isLocalDevFallback()) { // Check SMTP or sendmail availability
             $flashMessage = 'Email sending is not configured yet. Please set your SMTP credentials in CW/includes/mail_config.php.'; // Report missing mail config
             $flashType    = 'error'; // Style alert as error
         } else {
@@ -105,13 +105,17 @@ HTML; // End heredoc HTML OTP email body
                 . "This code expires in 10 minutes.\n\n"
                 . "If you did not request this, please ignore this email.";
 
-            $mailResult = Mailer::send($user['email'], $user['fullname'], 'Your Cine password security code', $htmlBody, $textBody); // Send OTP email via SMTP
+            $mailResult = Mailer::isLocalDevFallback()
+                ? ['ok' => true, 'error' => '', 'local_otp' => $otpCode]
+                : Mailer::send($user['email'], $user['fullname'], 'Your Cine password security code', $htmlBody, $textBody); // Send OTP email via SMTP
             if (!$mailResult['ok']) { // Handle SMTP delivery failure
                 unset($_SESSION['pwd_otp']); // Discard OTP if email could not be sent
                 $flashMessage = 'Could not send security code: ' . $mailResult['error']; // Display SMTP error
                 $flashType    = 'error'; // Style alert as error
             } else {
-                $_SESSION['flash']      = 'A 4-digit security code has been sent to ' . $user['email'] . '.'; // Notify user to check inbox
+                $_SESSION['flash'] = !empty($mailResult['local_otp'])
+                    ? 'Local Test Mode (SMTP not configured): Your 4-digit security code is ' . $mailResult['local_otp'] . '.'
+                    : 'A 4-digit security code has been sent to ' . $user['email'] . '.'; // Notify user to check inbox
                 $_SESSION['flash_type'] = 'success'; // Style flash as success
                 header('Location: settings.php'); // Redirect using PRG pattern
                 exit; // Stop execution
@@ -143,9 +147,13 @@ HTML; // End heredoc HTML OTP email body
                 . "<div style=\"font-size:32px;font-weight:bold;letter-spacing:10px;text-align:center;padding:16px;background:rgba(153,225,217,0.14);border:1px solid rgba(153,225,217,0.35);border-radius:10px;color:#99e1d9;margin-bottom:18px;\">{$newOtp}</div>"
                 . "</div>";
             $textBody = "Hi {$user['fullname']},\n\nYour new 4-digit Cine security code is: {$newOtp}\nThis code expires in 10 minutes.";
-            $retryMail = Mailer::send($user['email'], $user['fullname'], 'Your new Cine password security code', $htmlBody, $textBody);
+            $retryMail = Mailer::isLocalDevFallback()
+                ? ['ok' => true, 'error' => '', 'local_otp' => $newOtp]
+                : Mailer::send($user['email'], $user['fullname'], 'Your new Cine password security code', $htmlBody, $textBody);
             $flashMessage = $retryMail['ok']
-                ? 'Invalid 4-digit code! A new OTP has been sent to ' . $user['email'] . '.'
+                ? (!empty($retryMail['local_otp'])
+                    ? 'Invalid 4-digit code! Local Test Mode — your new OTP is ' . $retryMail['local_otp'] . '.'
+                    : 'Invalid 4-digit code! A new OTP has been sent to ' . $user['email'] . '.')
                 : 'Invalid 4-digit code, and could not resend new OTP: ' . $retryMail['error'];
             $flashType = 'error';
         } else {

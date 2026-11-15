@@ -47,6 +47,10 @@ function issueForgotOtp(array $user): array
 HTML;
     $textBody = "Hi {$user['fullname']},\n\nYour 4-digit Cine password reset OTP is: {$otpCode}\nThis code expires in 10 minutes.";
 
+    if (Mailer::isLocalDevFallback()) {
+        return ['ok' => true, 'error' => '', 'local_otp' => $otpCode];
+    }
+
     return Mailer::send($user['email'], $user['fullname'], 'Your Cine password reset OTP', $htmlBody, $textBody);
 }
 
@@ -75,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $flashMessage = 'Please enter a valid email address.';
             $flashType    = 'error';
-        } elseif (!Mailer::isConfigured() && trim((string)ini_get('sendmail_path')) === '') {
+        } elseif (!Mailer::isConfigured() && trim((string)ini_get('sendmail_path')) === '' && !Mailer::isLocalDevFallback()) {
             $flashMessage = 'Email sending is not configured yet.';
             $flashType    = 'error';
         } else {
@@ -89,7 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $flashMessage = 'Could not send OTP email: ' . $mailResult['error'];
                     $flashType    = 'error';
                 } else {
-                    $_SESSION['flash']      = 'A 4-digit OTP has been sent to ' . $user['email'] . '.';
+                    $_SESSION['flash'] = !empty($mailResult['local_otp'])
+                        ? 'Local Test Mode (SMTP not configured): Your 4-digit OTP is ' . $mailResult['local_otp'] . '.'
+                        : 'A 4-digit OTP has been sent to ' . $user['email'] . '.';
                     $_SESSION['flash_type'] = 'success';
                     header('Location: forgot_password.php');
                     exit;
@@ -114,7 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'fullname' => $otpData['fullname'],
             ]);
             $flashMessage = $mailResult['ok']
-                ? 'Incorrect OTP! A new 4-digit OTP has been sent to ' . $otpData['email'] . '.'
+                ? (!empty($mailResult['local_otp'])
+                    ? 'Incorrect OTP! Local Test Mode — your new 4-digit OTP is ' . $mailResult['local_otp'] . '.'
+                    : 'Incorrect OTP! A new 4-digit OTP has been sent to ' . $otpData['email'] . '.')
                 : 'Incorrect OTP, and could not resend new OTP: ' . $mailResult['error'];
             $flashType = 'error';
         } else {

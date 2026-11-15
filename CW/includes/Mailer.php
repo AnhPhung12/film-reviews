@@ -24,6 +24,17 @@ class Mailer
             && trim((string)($cfg['password'] ?? '')) !== ''; // Verify password is non-empty
     }
 
+    /** Returns true only on localhost when no mail transport is configured. */
+    public static function isLocalDevFallback(): bool
+    {
+        if (self::isConfigured() || trim((string)ini_get('sendmail_path')) !== '') {
+            return false;
+        }
+        $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+        $host = preg_replace('/:\d+$/', '', $host);
+        return in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+    }
+
     /** Sends an email via HTTPS API (Render-compatible) or SMTP (fallback for local/VPS). */
     public static function send(
         string $toEmail,
