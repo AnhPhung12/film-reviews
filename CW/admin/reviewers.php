@@ -165,10 +165,12 @@ ob_start(); // Start output buffering to capture reviewers table HTML
                             <td class="text-star mono" style="font-size:0.82rem">
                                 <?= $rv['avg_rating'] ? number_format((float)$rv['avg_rating'], 1) : '—' ?>
                             </td>
-                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap">
+                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap"
+                                <?php if (!empty($rv['registered_at'])): ?>data-local-dt="<?= htmlspecialchars(date('Y-m-d\TH:i:s+07:00', strtotime($rv['registered_at'])), ENT_QUOTES, 'UTF-8') ?>" data-local-fmt="date"<?php endif; ?>>
                                 <?= !empty($rv['registered_at']) ? htmlspecialchars(date('Y-m-d', strtotime($rv['registered_at']))) : 'Unknown' ?>
                             </td>
-                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap">
+                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap"
+                                <?php if (!empty($rv['registered_at'])): ?>data-local-dt="<?= htmlspecialchars(date('Y-m-d\TH:i:s+07:00', strtotime($rv['registered_at'])), ENT_QUOTES, 'UTF-8') ?>" data-local-fmt="time"<?php endif; ?>>
                                 <?= !empty($rv['registered_at']) ? htmlspecialchars(date('H:i:s', strtotime($rv['registered_at']))) : 'Unknown' ?>
                             </td>
                             <td>

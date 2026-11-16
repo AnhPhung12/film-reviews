@@ -258,8 +258,9 @@ ob_start(); // Begin output buffering to capture reviews table HTML
                             </td>
 
                             <!-- Date & Time -->
-                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap"><?= $r['date'] ?></td>
-                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap">
+                            <?php $revIso = (!empty($r['date']) && !empty($r['review_time'])) ? ($r['date'] . 'T' . $r['review_time'] . '+07:00') : ''; ?>
+                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap" <?= $revIso ? 'data-local-dt="' . htmlspecialchars($revIso, ENT_QUOTES, 'UTF-8') . '" data-local-fmt="date"' : '' ?>><?= $r['date'] ?></td>
+                            <td class="mono dim" style="font-size:0.72rem;white-space:nowrap" <?= $revIso ? 'data-local-dt="' . htmlspecialchars($revIso, ENT_QUOTES, 'UTF-8') . '" data-local-fmt="time"' : '' ?>>
                                 <?= !empty($r['review_time']) ? htmlspecialchars($r['review_time']) : '—' ?>
                             </td>
 

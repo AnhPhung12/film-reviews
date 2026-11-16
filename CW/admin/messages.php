@@ -99,7 +99,8 @@ ob_start(); // Begin output buffering to capture table HTML for admin/layout.php
                                 <?= mb_strlen($msg['content']) > 100 ? '…' : '' ?>
                             </td>
 
-                            <td class="mono dim" style="font-size:.72rem;white-space:nowrap">
+                            <td class="mono dim" style="font-size:.72rem;white-space:nowrap"
+                                data-local-dt="<?= htmlspecialchars(date('Y-m-d\TH:i:s+07:00', strtotime($msg['sent_at'])), ENT_QUOTES, 'UTF-8') ?>" data-local-fmt="short-dt">
                                 <?= date('M j, Y H:i', strtotime($msg['sent_at'])) ?>
                             </td>
 

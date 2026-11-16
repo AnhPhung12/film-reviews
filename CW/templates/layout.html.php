@@ -608,6 +608,22 @@ if (!empty($_SESSION['user_id'])) { // Only check when a user is logged in
                 wrap.appendChild(btn);
             });
         })();
+        document.addEventListener('DOMContentLoaded', function () {
+            var pad = function (n) { return String(n).padStart(2, '0'); };
+            document.querySelectorAll('[data-local-dt]').forEach(function (el) {
+                var d = new Date(el.getAttribute('data-local-dt') || '');
+                if (isNaN(d.getTime())) return;
+                var dateStr = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+                var timeStr = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+                var fmt = el.getAttribute('data-local-fmt') || 'datetime';
+                if (fmt === 'date') el.textContent = dateStr;
+                else if (fmt === 'time') el.textContent = timeStr;
+                else if (fmt === 'short-dt') {
+                    var mon = d.toLocaleString('en-US', { month: 'short' });
+                    el.textContent = mon + ' ' + d.getDate() + ', ' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+                } else el.textContent = dateStr + ' ' + timeStr;
+            });
+        });
     </script>
 </body>
 
