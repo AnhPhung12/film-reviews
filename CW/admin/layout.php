@@ -59,6 +59,11 @@
                 <span class="ni"><img src="icons/dashboard.png" class="ni-img" alt=""></span> Dashboard
             </a>
 
+            <a href="profile.php"
+                class="nav-item <?= ($activePage ?? '') === 'profile' ? 'active' : '' ?>">
+                <span class="ni">👤</span> Admin Profile
+            </a>
+
             <div class="nav-section">Manage</div>
             <a href="films.php"
                 class="nav-item <?= ($activePage ?? '') === 'films' ? 'active' : '' ?>">
@@ -109,7 +114,7 @@
             </div>
 
             <div class="topbar-right">
-                <span class="admin-pill">ADMIN</span>
+                <a href="profile.php" class="admin-pill" title="View Admin Profile">ADMIN</a>
                 <a href="../index.php" class="topbar-link" target="_blank">
                     ← Back to site
                 </a>
@@ -140,6 +145,7 @@
                 var fmt = el.getAttribute('data-local-fmt') || 'datetime';
                 if (fmt === 'date') el.textContent = dateStr;
                 else if (fmt === 'time') el.textContent = timeStr;
+                else if (fmt === 'date-time-parens') el.textContent = dateStr + ' (' + timeStr + ')';
                 else if (fmt === 'short-dt') {
                     var mon = d.toLocaleString('en-US', { month: 'short' });
                     el.textContent = mon + ' ' + d.getDate() + ', ' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());

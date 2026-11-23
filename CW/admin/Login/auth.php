@@ -19,3 +19,8 @@ if (empty($_SESSION['admin_logged_in'])) { // Verify the admin session flag is s
     header('Location: ' . dirname($_SERVER['PHP_SELF']) . '/Login/login.php'); // Redirect unauthenticated visitor to admin login
     exit; // Halt script execution immediately to protect the admin page
 }
+
+// Ensure admin profile session metadata is populated for existing sessions
+$_SESSION['admin_username'] ??= 'phung';
+$_SESSION['admin_email']    ??= 'jy261205@gmail.com';
+$_SESSION['admin_login_at'] ??= date('c');

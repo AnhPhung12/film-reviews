@@ -14,6 +14,7 @@ session_start(); // Start session so we can persist the admin login flag
 // Define administrator credentials
 define('ADMIN_USER', 'phung'); // Hardcoded admin username for coursework demo
 define('ADMIN_PASS', 'phung123'); // Hardcoded admin password for coursework demo
+define('ADMIN_EMAIL', 'jy261205@gmail.com'); // Administrator contact Gmail
 
 // Reject non-POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { // Ensure credentials are only accepted via POST
@@ -28,6 +29,9 @@ $pass = trim($_POST['password'] ?? ''); // Read and trim submitted admin passwor
 // Validate credentials against defined admin constants
 if ($user === ADMIN_USER && $pass === ADMIN_PASS) { // Compare submitted credentials with admin constants
     $_SESSION['admin_logged_in'] = true; // Mark session as authenticated administrator
+    $_SESSION['admin_username']  = ADMIN_USER; // Store admin username for profile display
+    $_SESSION['admin_email']     = ADMIN_EMAIL; // Store admin Gmail for profile display
+    $_SESSION['admin_login_at']  = date('c'); // Record ISO 8601 login timestamp for tracking
     header('Location: ../index.php'); // Redirect to the admin dashboard
     exit; // Stop script execution after redirect
 }
