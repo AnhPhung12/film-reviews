@@ -127,16 +127,19 @@ if (isset($_GET['edit'])) { // Check if an edit film ID was passed in query stri
     $editFilm = getFilmByIdForAdmin($eid); // Fetch film record for form pre-population
 }
 
-// Fetch paginated films (10 per page) and genres for display
-$repo       = new CinemaRepository();
-$limit      = 10;
-$totalFilms = $repo->countFilms();
-$totalPages = max(1, (int)ceil($totalFilms / $limit));
-$page       = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
-$offset     = ($page - 1) * $limit;
-$films      = $repo->getAllFilms('', '', '', $limit, $offset); // Query 10 films for the current admin page
-$genres     = getAllGenres(); // Query all genres for the form dropdown
-$showForm   = isset($_GET['add']) || !empty($editFilm); // Show Add/Edit form page only when requested
+// Fetch paginated films (10 per page), countries, and genres for display
+$repo          = new CinemaRepository();
+$filterCountry = trim((string)($_GET['country'] ?? ''));
+$filterGenre   = ($_GET['genre'] ?? '') !== '' ? (int)$_GET['genre'] : '';
+$limit         = 10;
+$totalFilms    = $repo->countFilms('', $filterGenre, $filterCountry);
+$totalPages    = max(1, (int)ceil($totalFilms / $limit));
+$page          = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
+$offset        = ($page - 1) * $limit;
+$films         = $repo->getAllFilms('', $filterGenre, $filterCountry, $limit, $offset); // Query 10 filtered films for the current admin page
+$countries     = $repo->getFilmCountries(); // Query distinct countries for header dropdown
+$genres        = getAllGenres(); // Query all genres for the form & header dropdowns
+$showForm      = isset($_GET['add']) || !empty($editFilm); // Show Add/Edit form page only when requested
 
 ob_start(); // Begin output buffering to capture films management view
 ?>
@@ -296,8 +299,42 @@ ob_start(); // Begin output buffering to capture films management view
                     <th>#</th>
                     <th>Poster</th>
                     <th>Title</th>
-                    <th>Country</th>
-                    <th>Genre</th>
+                    <th>
+                        <div class="sortable-heading">
+                            <span>Country</span>
+                            <form method="GET" class="column-sort-form">
+                                <?php if ($filterGenre !== ''): ?>
+                                    <input type="hidden" name="genre" value="<?= (int)$filterGenre ?>">
+                                <?php endif; ?>
+                                <select class="column-sort-select" name="country" aria-label="Filter films by country" onchange="this.form.submit()">
+                                    <option value="" <?= $filterCountry === '' ? 'selected' : '' ?>>All countries</option>
+                                    <?php foreach ($countries as $c): ?>
+                                        <option value="<?= htmlspecialchars($c, ENT_QUOTES, 'UTF-8') ?>" <?= $filterCountry === $c ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($c, ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="sortable-heading">
+                            <span>Genre</span>
+                            <form method="GET" class="column-sort-form">
+                                <?php if ($filterCountry !== ''): ?>
+                                    <input type="hidden" name="country" value="<?= htmlspecialchars($filterCountry, ENT_QUOTES, 'UTF-8') ?>">
+                                <?php endif; ?>
+                                <select class="column-sort-select" name="genre" aria-label="Filter films by genre" onchange="this.form.submit()">
+                                    <option value="" <?= $filterGenre === '' ? 'selected' : '' ?>>All genres</option>
+                                    <?php foreach ($genres as $g): ?>
+                                        <option value="<?= (int)$g['id'] ?>" <?= $filterGenre !== '' && $filterGenre === (int)$g['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($g['name'], ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
+                        </div>
+                    </th>
                     <th>Year / Dur</th>
                     <th>Media Links</th>
                     <th>Reviews</th>
@@ -412,8 +449,15 @@ ob_start(); // Begin output buffering to capture films management view
         </table>
     </div>
     <?php if ($totalPages > 1): ?>
+        <?php
+        $pagParams = array_filter([
+            'edit'    => isset($_GET['edit']) ? (int)$_GET['edit'] : null,
+            'country' => $filterCountry !== '' ? $filterCountry : null,
+            'genre'   => $filterGenre !== '' ? $filterGenre : null,
+        ], static fn($v) => $v !== null);
+        ?>
         <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);">
-            <?= renderPagination($page, $totalPages, 'films.php', isset($_GET['edit']) ? ['edit' => (int)$_GET['edit']] : []) ?>
+            <?= renderPagination($page, $totalPages, 'films.php', $pagParams) ?>
         </div>
     <?php endif; ?>
 </div>
