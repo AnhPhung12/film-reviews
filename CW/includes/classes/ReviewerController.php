@@ -36,6 +36,12 @@ class ReviewerController
         return $this->users->create($fullname, $email, $password); // Persist new reviewer account
     }
 
+    /** Authenticates a reviewer and returns structured status ('ok', 'suspended', 'invalid'). */
+    public function loginDetailed(string $email, string $password): array
+    {
+        return $this->users->authenticateDetailed(trim($email), $password);
+    }
+
     /** Authenticates a reviewer by email and password. */
     public function login(string $email, string $password): ?array
     {

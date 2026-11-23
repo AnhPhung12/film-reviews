@@ -38,8 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process login form on HTTP POST
     $email    = trim($_POST['email'] ?? ''); // Read and trim submitted email address
     $password = $_POST['password'] ?? ''; // Read submitted password
 
-    $user = $reviewerCtrl->login($email, $password); // Verify email, password hash, and active account status
-    if ($user) { // Proceed if credentials are valid and account is not suspended
+    $auth = $reviewerCtrl->loginDetailed($email, $password); // Verify email, password hash, and active account status
+    if ($auth['status'] === 'ok' && !empty($auth['user'])) { // Proceed if credentials are valid and account is not suspended
+        $user = $auth['user'];
         // Populate session variables for authenticated browsing
         $_SESSION['user_id']     = $user['id']; // Store authenticated reviewer ID
         $_SESSION['user_name']   = $user['fullname']; // Store display name for header/navigation
@@ -48,6 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process login form on HTTP POST
 
         header('Location: index.php'); // Redirect authenticated user to homepage
         exit; // Terminate execution after redirect
+    } elseif ($auth['status'] === 'suspended') {
+        $flashMessage = 'Your account is suspended. Please contact the administrator.'; // Inform suspended user clearly
+        $flashType    = 'error'; // Style alert as error
     } else {
         $flashMessage = 'Invalid email or password.'; // Show generic error to avoid leaking account existence
         $flashType    = 'error'; // Style alert as error

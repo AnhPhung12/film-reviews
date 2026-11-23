@@ -128,6 +128,21 @@ class UserRepository
         }, $defaults);
     }
 
+    /** Verifies email + password and returns structured status ('ok', 'suspended', or 'invalid'). */
+    public function authenticateDetailed(string $email, string $password): array
+    {
+        $statement = $this->db->prepare('SELECT * FROM reviewer WHERE email = ?'); // Fetch account by email
+        $statement->execute([$email]); // Execute lookup
+        $user = $statement->fetch(); // Retrieve user row
+        if (!$user || empty($user['password']) || !password_verify($password, $user['password'])) {
+            return ['status' => 'invalid', 'user' => null];
+        }
+        if (!empty($user['is_suspended'])) {
+            return ['status' => 'suspended', 'user' => null];
+        }
+        return ['status' => 'ok', 'user' => $user];
+    }
+
     /** Verifies email + password and rejects suspended accounts. */
     public function authenticate(string $email, string $password): ?array
     {
