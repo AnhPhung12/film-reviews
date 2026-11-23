@@ -79,11 +79,59 @@ function renderReviewSortDropdown(string $field, array $criteria, string $search
 if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process review deletion on HTTP POST
     $action = $_POST['action'] ?? ''; // Read submitted action
 
-    if ($action === 'delete') { // Permanently delete the selected review
-        $id = (int)($_POST['id'] ?? 0); // Cast review ID to integer
+    if ($action === 'delete') { // Permanently delete the selected review and notify author
+        $id     = (int)($_POST['id'] ?? 0); // Cast review ID to integer
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($reason === '') {
+            $reason = 'Removed by administrator for policy compliance.';
+        }
+        $repo   = new CinemaRepository();
+        $revRow = $repo->getReviewForEditing($id);
         deleteReview($id); // Delete review record from database
-        $_SESSION['flash']      = 'Review deleted successfully.'; // Set confirmation flash
+        if ($revRow && !empty($revRow['reviewerid'])) {
+            $filmTitle = (string)($revRow['film_title'] ?? 'a film');
+            $repo->addNotification(
+                (int)$revRow['reviewerid'],
+                'moderation',
+                'Review removed on "' . mb_substr($filmTitle, 0, 70) . '"',
+                'Reason: ' . mb_substr($reason, 0, 180),
+                'profile.php'
+            );
+        }
+        $_SESSION['flash']      = 'Review deleted and author notified.'; // Set confirmation flash
         $_SESSION['flash_type'] = 'success'; // Style flash as success
+    } elseif ($action === 'hide' || $action === 'unhide') {
+        $id     = (int)($_POST['id'] ?? 0);
+        $hide   = ($action === 'hide');
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($hide && $reason === '') {
+            $reason = 'Hidden by administrator for policy review.';
+        }
+        $repo   = new CinemaRepository();
+        $revRow = $repo->toggleHideReview($id, $hide, $reason);
+        if ($revRow && !empty($revRow['reviewerid'])) {
+            $filmTitle = (string)($revRow['film_title'] ?? 'a film');
+            if ($hide) {
+                $repo->addNotification(
+                    (int)$revRow['reviewerid'],
+                    'moderation',
+                    'Your review on "' . mb_substr($filmTitle, 0, 65) . '" was hidden',
+                    'Reason: ' . mb_substr($reason, 0, 180),
+                    'profile.php'
+                );
+                $_SESSION['flash'] = 'Review hidden and reviewer notified.';
+            } else {
+                $repo->addNotification(
+                    (int)$revRow['reviewerid'],
+                    'info',
+                    'Your review on "' . mb_substr($filmTitle, 0, 65) . '" was restored',
+                    'An administrator unhid your review. It is now visible publicly again.',
+                    'profile.php'
+                );
+                $_SESSION['flash'] = 'Review unhidden and reviewer notified.';
+            }
+            $_SESSION['flash_type'] = 'success';
+        }
     }
 
     // Preserve active search, genre, and sort state across PRG redirect
@@ -142,7 +190,7 @@ foreach ($requestedCriteria as $criterion) { // Deduplicate and validate each so
     $sortCriteria[]         = $criterion; // Append validated criterion
 }
 
-$reviews = getAllReviewsFiltered($search, $genreId, $sortCriteria); // Query filtered and multi-sorted reviews
+$reviews = (new CinemaRepository())->getAllReviewsFiltered($search, $genreId, $sortCriteria, 0, 0, '', true); // Query all matching reviews including hidden ones for admin
 
 ob_start(); // Begin output buffering to capture reviews table HTML
 ?>
@@ -252,9 +300,14 @@ ob_start(); // Begin output buffering to capture reviews table HTML
                             </td>
 
                             <!-- Review text preview (strip HTML tags, truncated to 90 characters) -->
-                            <td style="max-width:200px;font-size:0.82rem;color:var(--text-dim)">
+                            <td style="max-width:220px;font-size:0.82rem;color:var(--text-dim)">
                                 <?php $plainPreview = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags((string)$r['text']), ENT_QUOTES, 'UTF-8'))); ?>
                                 <?= htmlspecialchars(mb_substr($plainPreview, 0, 90), ENT_QUOTES, 'UTF-8') ?><?= mb_strlen($plainPreview) > 90 ? '…' : '' ?>
+                                <?php if (!empty($r['is_hidden'])): ?>
+                                    <div style="margin-top:0.35rem;padding:0.25rem 0.45rem;border-radius:6px;background:rgba(245,158,11,0.14);border-left:2px solid #f59e0b;font-size:0.74rem;color:#fcd34d;">
+                                        <strong>Hidden:</strong> <?= htmlspecialchars($r['hidden_reason'] ?? 'Policy review', ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
 
                             <!-- Date & Time -->
@@ -266,10 +319,26 @@ ob_start(); // Begin output buffering to capture reviews table HTML
 
                             <!-- Actions -->
                             <td>
-                                <div style="display:flex;gap:0.4rem">
-                                    <form method="POST" onsubmit="return confirm('Permanently delete this review?')">
+                                <div style="display:flex;gap:0.4rem;align-items:center;">
+                                    <?php if (empty($r['is_hidden'])): ?>
+                                        <button type="button" class="btn btn-ghost btn-sm" title="Hide review with reason"
+                                                onclick="openHideReviewModal(<?= (int)$r['id'] ?>, <?= htmlspecialchars(json_encode((string)$r['film_title']), ENT_QUOTES, 'UTF-8') ?>)">🙈</button>
+                                    <?php else: ?>
+                                        <form method="POST" style="margin:0;">
+                                            <input type="hidden" name="action" value="unhide">
+                                            <input type="hidden" name="id" value="<?= $r['id'] ?>">
+                                            <input type="hidden" name="search" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if ($genreId !== ''): ?><input type="hidden" name="genre" value="<?= (int)$genreId ?>"><?php endif; ?>
+                                            <?php foreach (array_reverse($sortCriteria) as $criterion): ?>
+                                                <input type="hidden" name="sort[]" value="<?= htmlspecialchars($criterion, ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php endforeach; ?>
+                                            <button type="submit" class="btn btn-ghost btn-sm" title="Unhide review">👁️</button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <form method="POST" style="margin:0;" onsubmit="var r = prompt('Optional reason for removing this review (will notify the reviewer):', 'Violated community guidelines'); if (r === null) return false; this.querySelector('[name=reason]').value = r; return true;">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="id" value="<?= $r['id'] ?>">
+                                        <input type="hidden" name="reason" value="">
                                         <input type="hidden" name="search" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
                                         <?php if ($genreId !== ''): ?><input type="hidden" name="genre" value="<?= (int)$genreId ?>"><?php endif; ?>
                                         <?php foreach (array_reverse($sortCriteria) as $criterion): ?>
@@ -292,6 +361,43 @@ ob_start(); // Begin output buffering to capture reviews table HTML
         </div>
     <?php endif; ?>
 </div>
+
+<!-- HIDE REVIEW REASON MODAL -->
+<div id="hideReviewModal" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;">
+    <div onclick="closeHideReviewModal()" style="position:absolute;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);"></div>
+    <div style="position:relative;z-index:2;width:min(480px,92vw);background:var(--bg2,#1f1820);border:1px solid var(--border,#3b3252);border-radius:12px;padding:1.25rem;box-shadow:0 24px 48px rgba(0,0,0,0.65);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+            <h3 style="margin:0;font-size:1.02rem;font-weight:700;">🙈 Hide Review — <span id="hideReviewFilmTitle"></span></h3>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeHideReviewModal()">✕</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="hide">
+            <input type="hidden" name="id" id="hideReviewId" value="">
+            <input type="hidden" name="search" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+            <?php if ($genreId !== ''): ?><input type="hidden" name="genre" value="<?= (int)$genreId ?>"><?php endif; ?>
+            <?php foreach (array_reverse($sortCriteria) as $criterion): ?>
+                <input type="hidden" name="sort[]" value="<?= htmlspecialchars($criterion, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endforeach; ?>
+            <label class="form-label" style="display:block;margin-bottom:0.4rem;">Reason for hiding (sent to the reviewer's notification bell)</label>
+            <textarea name="reason" id="hideReviewReason" class="form-input" rows="3" required placeholder="e.g. Contains spoilers without warning / Inappropriate language..." style="width:100%;resize:vertical;"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:0.9rem;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="closeHideReviewModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Hide &amp; Notify</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function openHideReviewModal(id, filmTitle) {
+    document.getElementById('hideReviewId').value = id;
+    document.getElementById('hideReviewFilmTitle').textContent = filmTitle || 'Film';
+    document.getElementById('hideReviewReason').value = '';
+    document.getElementById('hideReviewModal').style.display = 'flex';
+}
+function closeHideReviewModal() {
+    document.getElementById('hideReviewModal').style.display = 'none';
+}
+</script>
 
 <script>
 (function () {

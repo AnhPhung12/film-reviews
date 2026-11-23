@@ -81,7 +81,66 @@ if (!empty($_SESSION['user_id'])) { // Only check when a user is logged in
                     $navUser = (new UserRepository())->findById((int)$_SESSION['user_id']); // Query user avatar from DB
                     $_SESSION['user_avatar'] = $navUser['avatar'] ?? ''; // Cache avatar path in session
                 }
+                $navUnreadCount = 0;
+                $navNotifs      = [];
+                if (class_exists('CinemaRepository')) {
+                    try {
+                        $notifRepo      = new CinemaRepository();
+                        $navUnreadCount = $notifRepo->getUnreadNotificationCount((int)$_SESSION['user_id']);
+                        $navNotifs      = $notifRepo->getNotifications((int)$_SESSION['user_id'], 8);
+                    } catch (Throwable $e) {
+                        $navUnreadCount = 0;
+                        $navNotifs      = [];
+                    }
+                }
                 ?>
+                <li style="position:relative;">
+                    <button type="button" id="cineBellBtn" class="nav-link" aria-label="Notifications" aria-expanded="false"
+                            style="position:relative;display:inline-flex;align-items:center;gap:0.3rem;background:transparent;border:none;cursor:pointer;">
+                        <span style="font-size:1.1rem;line-height:1;">🔔</span>
+                        <?php if ($navUnreadCount > 0): ?>
+                            <span style="position:absolute;top:2px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:0.68rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;">
+                                <?= $navUnreadCount > 9 ? '9+' : $navUnreadCount ?>
+                            </span>
+                        <?php endif; ?>
+                    </button>
+                    <div id="cineBellMenu" class="glass" style="display:none;position:absolute;right:0;top:calc(100% + 10px);width:min(340px,88vw);z-index:2000;border-radius:12px;border:1px solid rgba(255,255,255,0.14);background:rgba(20,16,28,0.96);backdrop-filter:blur(14px);box-shadow:0 18px 40px rgba(0,0,0,0.55);overflow:hidden;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0.95rem;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <strong style="font-size:0.88rem;">Notifications <?= $navUnreadCount > 0 ? '(' . $navUnreadCount . ')' : '' ?></strong>
+                            <?php if ($navUnreadCount > 0): ?>
+                                <form method="post" action="notifications.php" style="margin:0;">
+                                    <input type="hidden" name="action" value="read_all">
+                                    <button type="submit" style="background:none;border:none;color:#7dd3fc;font-size:0.76rem;cursor:pointer;padding:0;">Mark all read</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                        <div style="max-height:300px;overflow-y:auto;">
+                            <?php if (empty($navNotifs)): ?>
+                                <div style="padding:1.25rem;text-align:center;font-size:0.82rem;color:rgba(255,255,255,0.6);">No notifications yet.</div>
+                            <?php else: ?>
+                                <?php foreach ($navNotifs as $nf): ?>
+                                    <a href="notifications.php?action=read&amp;id=<?= (int)$nf['id'] ?>"
+                                       style="display:block;padding:0.7rem 0.95rem;border-bottom:1px solid rgba(255,255,255,0.06);text-decoration:none;color:inherit;background:<?= empty($nf['is_read']) ? 'rgba(56,189,248,0.10)' : 'transparent' ?>;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+                                            <span style="font-size:0.8rem;font-weight:700;color:<?= ($nf['type'] ?? '') === 'moderation' ? '#fca5a5' : '#bae6fd' ?>;">
+                                                <?= ($nf['type'] ?? '') === 'moderation' ? '⚠️ ' : '💬 ' ?><?= htmlspecialchars($nf['title'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                            <?php if (empty($nf['is_read'])): ?>
+                                                <span style="width:7px;height:7px;border-radius:50%;background:#38bdf8;flex-shrink:0;"></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div style="font-size:0.78rem;color:rgba(255,255,255,0.78);margin-top:0.2rem;line-height:1.35;">
+                                            <?= htmlspecialchars($nf['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                        <div style="font-size:0.7rem;color:rgba(255,255,255,0.45);margin-top:0.25rem;">
+                                            <?= htmlspecialchars($nf['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                    </a>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </li>
                 <li>
                     <a href="profile.php" class="nav-link nav-profile <?= in_array(basename($_SERVER['PHP_SELF']), ['profile.php', 'settings.php'], true) ? 'active' : '' ?>">
                         <?= avatarHtml($_SESSION['user_avatar'] ?? null, $_SESSION['user_name'] ?? 'User', 'nav-avatar') ?>
@@ -622,6 +681,23 @@ if (!empty($_SESSION['user_id'])) { // Only check when a user is logged in
                     var mon = d.toLocaleString('en-US', { month: 'short' });
                     el.textContent = mon + ' ' + d.getDate() + ', ' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
                 } else el.textContent = dateStr + ' ' + timeStr;
+            });
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            var bellBtn = document.getElementById('cineBellBtn');
+            var bellMenu = document.getElementById('cineBellMenu');
+            if (!bellBtn || !bellMenu) return;
+            bellBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var isOpen = bellMenu.style.display === 'block';
+                bellMenu.style.display = isOpen ? 'none' : 'block';
+                bellBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            });
+            document.addEventListener('click', function (e) {
+                if (!bellMenu.contains(e.target) && e.target !== bellBtn) {
+                    bellMenu.style.display = 'none';
+                    bellBtn.setAttribute('aria-expanded', 'false');
+                }
             });
         });
     </script>

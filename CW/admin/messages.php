@@ -24,8 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reply
     $reply = trim((string)($_POST['reply'] ?? ''));
 
     if ($id > 0 && $reply !== '') {
-        $msgRow = (new CinemaRepository())->replyToMessage($id, $reply);
+        $repo   = new CinemaRepository();
+        $msgRow = $repo->replyToMessage($id, $reply);
         if ($msgRow) {
+            if (!empty($msgRow['reviewer_id'])) {
+                $repo->addNotification(
+                    (int)$msgRow['reviewer_id'],
+                    'reply',
+                    'Admin replied to: ' . mb_substr((string)($msgRow['subject'] ?? 'Your message'), 0, 80),
+                    mb_substr($reply, 0, 140),
+                    'profile.php#mySentMessages'
+                );
+            }
             if (!empty($msgRow['email']) && Mailer::isConfigured()) {
                 $subject = 'Re: [Cine] ' . ($msgRow['subject'] ?? 'Your inquiry');
                 $textBody = "Hello " . ($msgRow['fullname'] ?? 'Reviewer') . ",\n\n"

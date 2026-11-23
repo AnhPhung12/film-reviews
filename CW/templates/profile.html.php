@@ -203,6 +203,11 @@ $joinedTimeStr = date('H:i:s', $registeredTimestamp); // Format join time (HH:MM
                                     </div>
                                 </div>
                                 <p class="profile-review-text"><?= safeHtmlContent($rev['text'] ?? '') ?></p>
+                                <?php if (!empty($rev['is_hidden'])): ?>
+                                    <div style="margin-top:0.55rem;padding:0.55rem 0.75rem;border-radius:8px;background:rgba(245,158,11,0.12);border-left:3px solid #f59e0b;font-size:0.82rem;color:#fcd34d;">
+                                        <strong>⚠️ Hidden by Admin:</strong> <?= htmlspecialchars($rev['hidden_reason'] ?? 'Policy review', ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="profile-review-footer">
                                     <span class="profile-review-timestamp">
                                         🗓 <?= $revDate ?> <?= !empty($revTime) ? '· ' . $revTime : '' ?>

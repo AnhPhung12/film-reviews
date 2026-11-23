@@ -391,25 +391,62 @@ class CinemaRepository
     }
 
     /** Returns all reviews for a specific film ordered newest first. */
+    /** Ensures is_hidden and hidden_reason columns exist on the review table. */
+    public function ensureReviewModerationColumns(): void
+    {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+        $cols = $this->db->query("SHOW COLUMNS FROM review")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('is_hidden', $cols, true)) {
+            $this->db->exec("ALTER TABLE review ADD COLUMN is_hidden TINYINT(1) NOT NULL DEFAULT 0 AFTER rating");
+        }
+        if (!in_array('hidden_reason', $cols, true)) {
+            $this->db->exec("ALTER TABLE review ADD COLUMN hidden_reason VARCHAR(255) NULL AFTER is_hidden");
+        }
+    }
+
+    /** Hides or restores a review with an optional moderation reason and returns review/film metadata. */
+    public function toggleHideReview(int $id, bool $hide, string $reason = ''): ?array
+    {
+        $this->ensureReviewModerationColumns();
+        $st = $this->db->prepare("SELECT r.id, r.reviewerid, f.title AS film_title FROM review r JOIN film f ON r.filmid = f.id WHERE r.id = ? LIMIT 1");
+        $st->execute([$id]);
+        $row = $st->fetch();
+        if (!$row) {
+            return null;
+        }
+        $upd = $this->db->prepare("UPDATE review SET is_hidden = ?, hidden_reason = ? WHERE id = ?");
+        $upd->execute([$hide ? 1 : 0, $hide ? $reason : null, $id]);
+        return $row;
+    }
+
     public function getReviewsByFilm(int $filmId): array
     {
+        $this->ensureReviewModerationColumns();
         $st = $this->db->prepare("SELECT r.*, r.reviewtext AS text, r.reviewdate AS date, rv.fullname, rv.email, rv.avatar
                                 FROM review r
                                 JOIN reviewer rv ON r.reviewerid = rv.id
-                                WHERE r.filmid = ?
-                                ORDER BY r.reviewdate DESC"); // Query all reviews for a film
+                                WHERE r.filmid = ? AND COALESCE(r.is_hidden, 0) = 0
+                                ORDER BY r.reviewdate DESC"); // Query all visible reviews for a film
         $st->execute([$filmId]); // Bind film ID
         return $st->fetchAll(); // Return film reviews
     }
 
     /** Counts reviews matching optional film title search, genre filter, and country filter. */
-    public function countReviewsFiltered(string $search = '', string|int $genreId = '', string $country = ''): int
+    public function countReviewsFiltered(string $search = '', string|int $genreId = '', string $country = '', bool $includeHidden = false): int
     {
+        $this->ensureReviewModerationColumns();
         $sql = "SELECT COUNT(r.id)
                 FROM review r
                 JOIN reviewer rv ON r.reviewerid = rv.id
                 JOIN film f ON r.filmid = f.id
                 WHERE 1=1"; // Base review count query
+        if (!$includeHidden) {
+            $sql .= " AND COALESCE(r.is_hidden, 0) = 0";
+        }
         $params = []; // Bound parameter list
         if ($search !== '') { // Filter by film title substring
             $sql .= " AND f.title LIKE ?";
@@ -429,8 +466,9 @@ class CinemaRepository
     }
 
     /** Returns filtered, multi-column sorted, and paginated reviews using an allowlisted ORDER BY map. */
-    public function getAllReviewsFiltered(string $search = '', string|int $genreId = '', array|string $sort = [], int $limit = 0, int $offset = 0, string $country = ''): array
+    public function getAllReviewsFiltered(string $search = '', string|int $genreId = '', array|string $sort = [], int $limit = 0, int $offset = 0, string $country = '', bool $includeHidden = false): array
     {
+        $this->ensureReviewModerationColumns();
         $db = $this->db; // Local reference to PDO handle
         $sql = "SELECT r.*, r.reviewtext AS text, r.reviewdate AS date, r.reviewtime AS review_time, rv.fullname, rv.email, rv.avatar,
                        f.title AS film_title, f.id AS film_id, f.poster, g.name AS genre_name
@@ -439,6 +477,9 @@ class CinemaRepository
                 JOIN film f ON r.filmid = f.id
                 LEFT JOIN genre g ON f.genreid = g.id
                 WHERE 1=1"; // Base query joining reviewer, film, and genre
+        if (!$includeHidden) {
+            $sql .= " AND COALESCE(r.is_hidden, 0) = 0";
+        }
 
         $params = []; // Bound parameter list
         if ($search !== '') { // Filter by film title substring
@@ -574,6 +615,78 @@ class CinemaRepository
     public function deleteMessage(int $id): bool
     {
         return $this->db->prepare("UPDATE contact_us SET is_active = 0 WHERE id = ?")->execute([$id]); // Archive message via soft-delete flag
+    }
+
+    /** Ensures the reviewer notifications table exists. */
+    public function ensureNotificationsTable(): void
+    {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+        $this->db->exec("CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            reviewer_id INT NOT NULL,
+            type VARCHAR(40) NOT NULL DEFAULT 'info',
+            title VARCHAR(180) NOT NULL,
+            message VARCHAR(500) NOT NULL,
+            target_url VARCHAR(255) NOT NULL DEFAULT 'profile.php',
+            is_read TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_notif_reviewer (reviewer_id, is_read, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    /** Inserts a new notification for a reviewer. */
+    public function addNotification(int $reviewerId, string $type, string $title, string $message, string $targetUrl = 'profile.php'): bool
+    {
+        if ($reviewerId <= 0) {
+            return false;
+        }
+        $this->ensureNotificationsTable();
+        $st = $this->db->prepare("INSERT INTO notifications (reviewer_id, type, title, message, target_url) VALUES (?, ?, ?, ?, ?)");
+        return $st->execute([$reviewerId, $type, $title, $message, $targetUrl]);
+    }
+
+    /** Returns the latest notifications for a reviewer. */
+    public function getNotifications(int $reviewerId, int $limit = 10): array
+    {
+        $this->ensureNotificationsTable();
+        $limit = max(1, min(30, $limit));
+        $st = $this->db->prepare("SELECT * FROM notifications WHERE reviewer_id = ? ORDER BY created_at DESC, id DESC LIMIT {$limit}");
+        $st->execute([$reviewerId]);
+        return $st->fetchAll();
+    }
+
+    /** Counts unread notifications for a reviewer. */
+    public function getUnreadNotificationCount(int $reviewerId): int
+    {
+        $this->ensureNotificationsTable();
+        $st = $this->db->prepare("SELECT COUNT(*) FROM notifications WHERE reviewer_id = ? AND is_read = 0");
+        $st->execute([$reviewerId]);
+        return (int)$st->fetchColumn();
+    }
+
+    /** Marks a single notification as read (owner-checked) and returns its target URL. */
+    public function markNotificationRead(int $id, int $reviewerId): ?string
+    {
+        $this->ensureNotificationsTable();
+        $st = $this->db->prepare("SELECT target_url FROM notifications WHERE id = ? AND reviewer_id = ? LIMIT 1");
+        $st->execute([$id, $reviewerId]);
+        $target = $st->fetchColumn();
+        if ($target === false) {
+            return null;
+        }
+        $this->db->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND reviewer_id = ?")->execute([$id, $reviewerId]);
+        return (string)$target;
+    }
+
+    /** Marks all notifications as read for a reviewer. */
+    public function markAllNotificationsRead(int $reviewerId): bool
+    {
+        $this->ensureNotificationsTable();
+        return $this->db->prepare("UPDATE notifications SET is_read = 1 WHERE reviewer_id = ? AND is_read = 0")->execute([$reviewerId]);
     }
 
     /** Returns aggregate entity counts for the admin dashboard and home page. */
