@@ -529,14 +529,45 @@ class CinemaRepository
         return $this->db->prepare($sql)->execute([$reviewer_id, $subject, $content]); // Store message with current timestamp
     }
 
+    /** Ensures admin_reply and replied_at columns exist on contact_us. */
+    public function ensureContactReplyColumns(): void
+    {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+        $cols = $this->db->query("SHOW COLUMNS FROM contact_us")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('admin_reply', $cols, true)) {
+            $this->db->exec("ALTER TABLE contact_us ADD COLUMN admin_reply TEXT NULL AFTER content");
+        }
+        if (!in_array('replied_at', $cols, true)) {
+            $this->db->exec("ALTER TABLE contact_us ADD COLUMN replied_at DATETIME NULL AFTER admin_reply");
+        }
+    }
+
     /** Returns all active (non-archived) contact messages ordered newest first. */
     public function getAllMessages(): array
     {
+        $this->ensureContactReplyColumns();
         return $this->db->query("SELECT c.*, r.fullname, r.email
                                FROM contact_us as c
                                JOIN reviewer as r ON c.reviewer_id = r.id
                                WHERE c.is_active = 1
                                ORDER BY c.sent_at DESC")->fetchAll(); // Fetch active messages with sender info
+    }
+
+    /** Saves an administrator reply to a contact message and returns sender details. */
+    public function replyToMessage(int $id, string $reply): ?array
+    {
+        $this->ensureContactReplyColumns();
+        $upd = $this->db->prepare("UPDATE contact_us SET admin_reply = ?, replied_at = NOW() WHERE id = ? AND is_active = 1");
+        $upd->execute([$reply, $id]);
+
+        $st = $this->db->prepare("SELECT c.*, r.fullname, r.email FROM contact_us c JOIN reviewer r ON c.reviewer_id = r.id WHERE c.id = ? LIMIT 1");
+        $st->execute([$id]);
+        $row = $st->fetch();
+        return $row ?: null;
     }
 
     /** Soft-deletes a contact message by setting is_active = 0. */

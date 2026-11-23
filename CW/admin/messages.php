@@ -12,10 +12,46 @@
 
 require_once 'Login/auth.php'; // Enforce admin authentication before accessing messages
 require_once '../includes/DataBaseFunctions.php'; // Load message query and soft-delete helpers
+require_once '../includes/Mailer.php'; // Load SMTP/API mailer for admin replies
 
 // Page configuration
 $pageTitle  = 'Messages'; // Set page title in admin topbar
 $activePage = 'messages'; // Highlight Messages link in sidebar navigation
+
+// Handle POST admin reply action
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reply') {
+    $id    = (int)($_POST['id'] ?? 0);
+    $reply = trim((string)($_POST['reply'] ?? ''));
+
+    if ($id > 0 && $reply !== '') {
+        $msgRow = (new CinemaRepository())->replyToMessage($id, $reply);
+        if ($msgRow) {
+            if (!empty($msgRow['email']) && Mailer::isConfigured()) {
+                $subject = 'Re: [Cine] ' . ($msgRow['subject'] ?? 'Your inquiry');
+                $textBody = "Hello " . ($msgRow['fullname'] ?? 'Reviewer') . ",\n\n"
+                    . "An administrator replied to your message:\n"
+                    . "----------------------------------------\n"
+                    . $reply . "\n"
+                    . "----------------------------------------\n\n"
+                    . "Original message (" . ($msgRow['subject'] ?? '') . "):\n"
+                    . ($msgRow['content'] ?? '');
+                $htmlBody = nl2br(htmlspecialchars($textBody, ENT_QUOTES, 'UTF-8'));
+                Mailer::send($msgRow['email'], $msgRow['fullname'] ?? 'Reviewer', $subject, $htmlBody, $textBody);
+            }
+            $_SESSION['flash']      = 'Reply saved and sent to reviewer.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash']      = 'Message not found.';
+            $_SESSION['flash_type'] = 'error';
+        }
+    } else {
+        $_SESSION['flash']      = 'Please enter a reply message.';
+        $_SESSION['flash_type'] = 'error';
+    }
+
+    header('Location: messages.php');
+    exit;
+}
 
 // Handle POST soft-delete action
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete') { // Process message deletion on POST
@@ -94,9 +130,14 @@ ob_start(); // Begin output buffering to capture table HTML for admin/layout.php
                             </td>
 
                             <!-- Message preview truncated to 100 UTF-8 characters -->
-                            <td style="max-width:220px;font-size:.82rem;color:var(--text-dim)">
+                            <td style="max-width:240px;font-size:.82rem;color:var(--text-dim)">
                                 <?= htmlspecialchars(mb_substr($msg['content'], 0, 100)) ?>
                                 <?= mb_strlen($msg['content']) > 100 ? '…' : '' ?>
+                                <?php if (!empty($msg['admin_reply'])): ?>
+                                    <div style="margin-top:0.35rem;padding:0.3rem 0.5rem;border-radius:6px;background:rgba(56,189,248,0.12);border-left:2px solid #38bdf8;font-size:.76rem;color:#bae6fd;">
+                                        <strong>Reply:</strong> <?= htmlspecialchars(mb_substr($msg['admin_reply'], 0, 70)) ?><?= mb_strlen($msg['admin_reply']) > 70 ? '…' : '' ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
 
                             <td class="mono dim" style="font-size:.72rem;white-space:nowrap"
@@ -105,13 +146,23 @@ ob_start(); // Begin output buffering to capture table HTML for admin/layout.php
                             </td>
 
                             <td>
-                                <form method="POST"
-                                    onsubmit="return confirm('Delete this message?')">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="<?= $msg['id'] ?>">
-                                    <button type="submit"
-                                        class="btn btn-danger btn-sm">🗑️</button>
-                                </form>
+                                <div style="display:flex;gap:0.4rem;align-items:center;">
+                                    <button type="button" class="btn btn-ghost btn-sm" title="Reply to client"
+                                        data-id="<?= (int)$msg['id'] ?>"
+                                        data-sender="<?= htmlspecialchars($msg['fullname'] ?? 'User', ENT_QUOTES, 'UTF-8') ?>"
+                                        data-email="<?= htmlspecialchars($msg['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                        data-subject="<?= htmlspecialchars($msg['subject'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                        data-content="<?= htmlspecialchars($msg['content'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                        data-reply="<?= htmlspecialchars($msg['admin_reply'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                        onclick="openReplyModal(this)">💬</button>
+                                    <form method="POST"
+                                        onsubmit="return confirm('Delete this message?')">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= $msg['id'] ?>">
+                                        <button type="submit"
+                                            class="btn btn-danger btn-sm">🗑️</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -120,6 +171,46 @@ ob_start(); // Begin output buffering to capture table HTML for admin/layout.php
         </div>
     <?php endif; ?>
 </div>
+
+<!-- ADMIN REPLY MODAL -->
+<div id="replyModal" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;">
+    <div onclick="closeReplyModal()" style="position:absolute;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);"></div>
+    <div style="position:relative;z-index:2;width:min(540px,92vw);background:var(--bg2,#1f1820);border:1px solid var(--border,#3b3252);border-radius:12px;padding:1.25rem;box-shadow:0 24px 48px rgba(0,0,0,0.65);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+            <h3 style="margin:0;font-size:1.05rem;font-weight:700;">💬 Reply to <span id="replySenderName"></span></h3>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeReplyModal()">✕</button>
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-dim);margin-bottom:0.75rem;padding:0.65rem;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border,#3b3252);">
+            <div><strong>Email:</strong> <span id="replySenderEmail"></span></div>
+            <div><strong>Subject:</strong> <span id="replyMsgSubject"></span></div>
+            <div id="replyMsgContent" style="margin-top:0.4rem;white-space:pre-line;"></div>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="reply">
+            <input type="hidden" name="id" id="replyMsgId" value="">
+            <label class="form-label" style="display:block;margin-bottom:0.4rem;">Your Reply (saved to client profile &amp; emailed)</label>
+            <textarea name="reply" id="replyTextarea" class="form-input" rows="4" required placeholder="Write your response to the reviewer..." style="width:100%;resize:vertical;"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:0.9rem;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="closeReplyModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Send Reply</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function openReplyModal(btn) {
+    document.getElementById('replyMsgId').value = btn.dataset.id || '';
+    document.getElementById('replySenderName').textContent = btn.dataset.sender || 'Reviewer';
+    document.getElementById('replySenderEmail').textContent = btn.dataset.email || '';
+    document.getElementById('replyMsgSubject').textContent = btn.dataset.subject || '';
+    document.getElementById('replyMsgContent').textContent = btn.dataset.content || '';
+    document.getElementById('replyTextarea').value = btn.dataset.reply || '';
+    document.getElementById('replyModal').style.display = 'flex';
+}
+function closeReplyModal() {
+    document.getElementById('replyModal').style.display = 'none';
+}
+</script>
 
 <?php
 $content = ob_get_clean(); // Capture buffered messages table HTML into $content

@@ -258,6 +258,15 @@ $joinedTimeStr = date('H:i:s', $registeredTimestamp); // Format join time (HH:MM
                                 </div>
                                 <p class="profile-review-text" style="white-space: pre-line;"><?= htmlspecialchars($msg['content'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
 
+                                <?php if (!empty($msg['admin_reply'])): ?>
+                                    <div style="margin-top: 0.65rem; padding: 0.75rem 0.9rem; border-radius: 8px; background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;">
+                                        <div style="font-size: 0.78rem; font-weight: 700; color: #7dd3fc; margin-bottom: 0.25rem;">
+                                            💬 Admin Reply <?= !empty($msg['replied_at']) ? '· ' . htmlspecialchars($msg['replied_at'], ENT_QUOTES, 'UTF-8') : '' ?>
+                                        </div>
+                                        <div style="font-size: 0.9rem; white-space: pre-line;"><?= htmlspecialchars($msg['admin_reply'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    </div>
+                                <?php endif; ?>
+
                                 <form method="post" action="profile.php#mySentMessages" id="msgEditForm-<?= $mId ?>" style="display: none; margin-top: 0.75rem;">
                                     <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['profile_token'], ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="action" value="update_message">

@@ -205,7 +205,8 @@ try {
     $userReviews = $revStmt->fetchAll(PDO::FETCH_ASSOC); // Fetch all matching review rows
 
     // Active contact messages sent by this user (newest first)
-    $msgStmt = $db->prepare("SELECT id, subject, content, sent_at FROM contact_us WHERE reviewer_id = ? AND is_active = 1 ORDER BY sent_at DESC");
+    (new CinemaRepository())->ensureContactReplyColumns();
+    $msgStmt = $db->prepare("SELECT id, subject, content, sent_at, admin_reply, replied_at FROM contact_us WHERE reviewer_id = ? AND is_active = 1 ORDER BY sent_at DESC");
     $msgStmt->execute([(int)$user['id']]);
     $userMessages = $msgStmt->fetchAll(PDO::FETCH_ASSOC);
     $messageCount = count($userMessages);
