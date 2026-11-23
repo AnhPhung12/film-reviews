@@ -13,18 +13,18 @@
  * 3. Put your Gmail address in 'username' / 'from_email' and the 16-char App Password in 'password'.
  */
 return [
-    // SMTP server hostname
-    'host'       => getenv('CW_SMTP_HOST') ?: 'smtp.gmail.com',
+    // SMTP server hostname (falls back to shared local JOKE_SMTP_* Apache SetEnv when CW_SMTP_* is unset)
+    'host'       => getenv('CW_SMTP_HOST') ?: (getenv('JOKE_SMTP_HOST') ?: 'smtp.gmail.com'),
     // SMTP port: 587 for 'tls' (STARTTLS), 465 for 'ssl'
-    'port'       => (int)(getenv('CW_SMTP_PORT') ?: 587),
+    'port'       => (int)(getenv('CW_SMTP_PORT') ?: (getenv('JOKE_SMTP_PORT') ?: 587)),
     // Transport encryption: 'tls', 'ssl', or ''
     'encryption' => getenv('CW_SMTP_ENCRYPTION') ?: 'tls',
     // SMTP authentication username (e.g. 'yourname@gmail.com')
-    'username'   => getenv('CW_SMTP_USERNAME') ?: '',
+    'username'   => getenv('CW_SMTP_USERNAME') ?: (getenv('JOKE_SMTP_USERNAME') ?: ''),
     // SMTP password or 16-character App Password
-    'password'   => getenv('CW_SMTP_PASSWORD') ?: '',
+    'password'   => getenv('CW_SMTP_PASSWORD') ?: (getenv('JOKE_SMTP_PASSWORD') ?: ''),
     // Sender email address (defaults to 'username' if left empty)
-    'from_email' => getenv('CW_MAIL_FROM') ?: '',
+    'from_email' => getenv('CW_MAIL_FROM') ?: (getenv('JOKE_MAIL_FROM') ?: ''),
     // Display name shown in the From header
     'from_name'  => getenv('CW_MAIL_FROM_NAME') ?: 'Cine Film Reviews',
 ];

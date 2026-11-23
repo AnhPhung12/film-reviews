@@ -20,6 +20,14 @@ class AiService
     {
         $cfg = self::loadConfig(); // Load AI provider configuration array
         $provider = strtolower(trim((string)($cfg['provider'] ?? 'gemini'))); // Normalize selected provider name
+        $apiKey = $provider === 'openai'
+            ? trim((string)($cfg['openai_api_key'] ?? ''))
+            : trim((string)($cfg['gemini_api_key'] ?? ''));
+
+        // Fallback to local database film catalog when no external AI key is configured (e.g. local grading)
+        if ($apiKey === '') {
+            return self::localCatalogFallback($userMessage, $filmId);
+        }
 
         if (!function_exists('curl_init')) { // Fail gracefully if PHP cURL extension is unavailable
             return ['ok' => false, 'reply' => '', 'error' => 'PHP cURL extension is not enabled.'];
@@ -34,6 +42,69 @@ class AiService
         }
 
         return self::callGemini($cfg, $systemPrompt, $cleanHistory, $userMessage); // Default to Google Gemini API
+    }
+
+    /** Provides an offline film-catalog response when no external AI API key is configured. */
+    private static function localCatalogFallback(string $userMessage, ?int $filmId = null): array
+    {
+        $repo  = new CinemaRepository();
+        $films = $repo->getAllFilms();
+        $lower = mb_strtolower($userMessage);
+
+        $matched = null;
+        if ($filmId !== null && $filmId > 0) {
+            $matched = $repo->getFilmById($filmId);
+        }
+
+        if (!$matched) {
+            foreach ($films as $f) {
+                $title = trim((string)($f['title'] ?? ''));
+                if ($title !== '' && mb_stripos($lower, mb_strtolower($title)) !== false) {
+                    $matched = $repo->getFilmById((int)$f['id']) ?: $f;
+                    break;
+                }
+            }
+        }
+
+        if ($matched) {
+            $title    = $matched['title'] ?? 'Untitled';
+            $year     = !empty($matched['release_year']) ? " ({$matched['release_year']})" : '';
+            $genre    = $matched['genre_name'] ?? 'Unknown';
+            $country  = $matched['country'] ?? '';
+            $dur      = !empty($matched['duration_min']) ? $matched['duration_min'] . ' min' : '';
+            $cast     = trim((string)($matched['cast'] ?? ''));
+            $synopsis = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags((string)($matched['synopsis'] ?? '')), ENT_QUOTES, 'UTF-8')));
+
+            $metaParts = array_filter([$genre, $country, $dur]);
+            $lines = ["🎬 **{$title}{$year}**"];
+            if ($metaParts) {
+                $lines[] = implode(' • ', $metaParts);
+            }
+            if ($cast !== '') {
+                $lines[] = "Starring: {$cast}";
+            }
+            $lines[] = '';
+            $lines[] = $synopsis !== '' ? $synopsis : 'No plot synopsis is stored for this film yet.';
+
+            $reviews = $repo->getReviewsByFilm((int)$matched['id']);
+            if (!empty($reviews)) {
+                $avg = number_format(array_sum(array_column($reviews, 'rating')) / count($reviews), 1);
+                $lines[] = '';
+                $lines[] = "⭐ Cine Rating: {$avg}/5 (" . count($reviews) . ' review' . (count($reviews) > 1 ? 's' : '') . ')';
+            }
+
+            $lines[] = '';
+            $lines[] = '(Local Catalog Mode: Gemini API key not set — showing summary from Cine database.)';
+
+            return ['ok' => true, 'reply' => implode("\n", $lines), 'error' => ''];
+        }
+
+        $sampleTitles = array_slice(array_map(fn($f) => $f['title'] . (!empty($f['release_year']) ? " ({$f['release_year']})" : ''), $films), 0, 8);
+        $reply = "Hi! I'm running in **Local Catalog Mode** (no Gemini API key configured).\n\n"
+            . "Ask me about any film in Cine's database, for example:\n• "
+            . (!empty($sampleTitles) ? implode("\n• ", $sampleTitles) : 'No films found in database.');
+
+        return ['ok' => true, 'reply' => $reply, 'error' => ''];
     }
 
     /** Loads AI provider settings from ai_config.php. */

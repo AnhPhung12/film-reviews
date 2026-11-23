@@ -1,4 +1,5 @@
 <?php
+
 /**
  * contact.php — Contact Us Form & Admin Notification Controller.
  *
@@ -13,6 +14,7 @@
 
 session_start(); // Start or resume session to verify login and store flash messages
 require_once __DIR__ . '/includes/DataBaseFunctions.php'; // Load database helper functions including addContactMessage()
+require_once __DIR__ . '/includes/Mailer.php';
 
 // Require login before accessing the contact form
 if (!isset($_SESSION['user_id'])) { // Restrict contact form to authenticated users
@@ -29,7 +31,7 @@ $old          = []; // Store submitted form values for repopulation on error
 $flashMessage = ''; // Initialize inline alert message
 $flashType    = 'success'; // Default inline alert style
 
-define('ADMIN_EMAIL', 'admin@cine.com'); // Define recipient email address for admin notifications
+define('ADMIN_EMAIL', 'jy261205@gmail.com'); // Define recipient email address for admin notifications
 
 // Handle POST form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process contact message only on HTTP POST
@@ -72,7 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process contact message only on 
                 . "Message:\n"   . $content; // Include full message content
 
             // Attempt mail delivery (suppressed if local SMTP is unconfigured)
-            @mail(ADMIN_EMAIL, '[Cine] ' . $subject, $body, $headers); // Dispatch notification email without failing if local mail server is absent
+            if (Mailer::isConfigured()) {
+                Mailer::send(
+                    ADMIN_EMAIL,
+                    'Cine Admin',
+                    '[Cine] ' . $subject,
+                    nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')),
+                    $body
+                );
+            } // Dispatch notification email without failing if local mail server is absent
 
             // Redirect using PRG pattern with success flash
             $_SESSION['flash']      = 'Your message has been sent!'; // Store success flash message

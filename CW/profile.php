@@ -1,4 +1,5 @@
 <?php
+
 /**
  * profile.php — Authenticated User Profile & Avatar Management Controller.
  *
@@ -24,7 +25,7 @@ if (empty($_SESSION['user_id'])) { // Enforce authentication before viewing prof
     header('Location: loginUser.php'); // Redirect guest to login page
     exit; // Stop script execution
 }
-
+// Profile
 $pageTitle    = 'My Profile'; // Set page title for layout template
 $flashMessage = ''; // Initialize inline alert message
 $flashType    = 'success'; // Default inline alert style
