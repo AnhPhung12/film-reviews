@@ -231,6 +231,75 @@ $joinedTimeStr = date('H:i:s', $registeredTimestamp); // Format join time (HH:MM
                 </div>
             <?php endif; ?>
         </div>
+
+        <!-- User Sent Contact Messages Block -->
+        <div class="profile-reviews-block" id="mySentMessages" style="margin-top: 2.25rem;">
+            <div class="profile-reviews-head">
+                <div>
+                    <div class="profile-eyebrow">CONTACT HISTORY</div>
+                    <h2 class="profile-block-title">My Sent Messages</h2>
+                </div>
+                <a href="contact.php" class="btn btn-ghost btn-sm">+ Send new message</a>
+            </div>
+
+            <?php if (!empty($userMessages)): ?>
+                <div class="profile-reviews-list">
+                    <?php foreach ($userMessages as $msg):
+                        $mId = (int)$msg['id'];
+                        $mDate = !empty($msg['sent_at']) ? htmlspecialchars($msg['sent_at'], ENT_QUOTES, 'UTF-8') : '';
+                    ?>
+                        <article class="profile-review-card glass" style="grid-template-columns: 1fr;">
+                            <div class="profile-review-body">
+                                <div class="profile-review-top">
+                                    <div>
+                                        <h3 class="profile-review-film-title"><?= htmlspecialchars($msg['subject'] ?? '', ENT_QUOTES, 'UTF-8') ?></h3>
+                                    </div>
+                                    <span class="profile-review-timestamp">✉️ <?= $mDate ?></span>
+                                </div>
+                                <p class="profile-review-text" style="white-space: pre-line;"><?= htmlspecialchars($msg['content'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
+
+                                <form method="post" action="profile.php#mySentMessages" id="msgEditForm-<?= $mId ?>" style="display: none; margin-top: 0.75rem;">
+                                    <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['profile_token'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="action" value="update_message">
+                                    <input type="hidden" name="message_id" value="<?= $mId ?>">
+                                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <input type="text" name="subject" class="form-input" value="<?= htmlspecialchars($msg['subject'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required placeholder="Subject">
+                                        <textarea name="content" class="form-textarea" rows="3" minlength="10" required placeholder="Message (min 10 characters)"><?= htmlspecialchars($msg['content'] ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
+                                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('msgEditForm-<?= $mId ?>').style.display='none';">Cancel</button>
+                                            <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <div class="profile-review-footer" style="margin-top: 0.75rem;">
+                                    <span class="profile-review-timestamp">Status: Active</span>
+                                    <div class="profile-review-actions">
+                                        <button type="button" class="btn-review-action btn-review-edit"
+                                                onclick="var f=document.getElementById('msgEditForm-<?= $mId ?>'); f.style.display = f.style.display === 'none' ? 'block' : 'none';">
+                                            ✏️ Edit
+                                        </button>
+                                        <form method="post" action="profile.php#mySentMessages" style="display: inline;" onsubmit="return confirm('Delete this sent message?');">
+                                            <input type="hidden" name="token" value="<?= htmlspecialchars($_SESSION['profile_token'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <input type="hidden" name="action" value="delete_message">
+                                            <input type="hidden" name="message_id" value="<?= $mId ?>">
+                                            <button type="submit" class="btn-review-action btn-review-delete">🗑️ Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="profile-empty-reviews glass">
+                    <div class="profile-empty-icon" aria-hidden="true">✉️</div>
+                    <h3 class="profile-empty-title">No sent messages yet</h3>
+                    <p class="profile-empty-sub">Need help or want to share feedback? Send a message to the administrator and manage your sent inquiries here.</p>
+                    <a href="contact.php" class="btn btn-primary">Contact Us</a>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 </section>
 

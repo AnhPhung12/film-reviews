@@ -51,6 +51,44 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') { // Process avatar changes o
     if (!hash_equals($_SESSION['profile_token'], $_POST['token'] ?? '')) { // Constant-time CSRF token validation
         $flashMessage = 'Your session expired. Please try again.'; // Reject invalid or expired CSRF token
         $flashType    = 'error'; // Style alert as error
+    } elseif ($action === 'update_message') { // Handle owner-only edit of a sent contact message
+        $msgId   = (int)($_POST['message_id'] ?? 0);
+        $subject = trim($_POST['subject'] ?? '');
+        $content = trim($_POST['content'] ?? '');
+
+        if ($msgId <= 0 || empty($subject) || mb_strlen($content) < 10) {
+            $flashMessage = 'Please provide a subject and at least 10 characters for your message.';
+            $flashType    = 'error';
+        } else {
+            try {
+                $db   = DatabaseConnection::getInstance()->getConnection();
+                $stmt = $db->prepare('UPDATE contact_us SET subject = ?, content = ? WHERE id = ? AND reviewer_id = ? AND is_active = 1');
+                $stmt->execute([$subject, $content, $msgId, (int)$user['id']]);
+                $_SESSION['flash']      = 'Your message has been updated.';
+                $_SESSION['flash_type'] = 'success';
+                header('Location: profile.php#mySentMessages');
+                exit;
+            } catch (Throwable $e) {
+                $flashMessage = 'Could not update your message.';
+                $flashType    = 'error';
+            }
+        }
+    } elseif ($action === 'delete_message') { // Handle owner-only soft-delete of a sent contact message
+        $msgId = (int)($_POST['message_id'] ?? 0);
+        if ($msgId > 0) {
+            try {
+                $db   = DatabaseConnection::getInstance()->getConnection();
+                $stmt = $db->prepare('UPDATE contact_us SET is_active = 0 WHERE id = ? AND reviewer_id = ?');
+                $stmt->execute([$msgId, (int)$user['id']]);
+                $_SESSION['flash']      = 'Your message has been deleted.';
+                $_SESSION['flash_type'] = 'success';
+                header('Location: profile.php#mySentMessages');
+                exit;
+            } catch (Throwable $e) {
+                $flashMessage = 'Could not delete your message.';
+                $flashType    = 'error';
+            }
+        }
     } else {
         $removeAvatar   = ($_POST['remove_avatar'] ?? '') === '1'; // Check if user requested avatar removal
         $selectedPreset = trim($_POST['preset_avatar'] ?? ''); // Read selected preset avatar path
@@ -145,8 +183,9 @@ if (empty($flashMessage)) { // Only read session flash if no inline error is act
     unset($_SESSION['flash'], $_SESSION['flash_type']); // Clear flash keys after reading
 }
 
-// Fetch user's published reviews and contact message count
+// Fetch user's published reviews and active sent contact messages
 $userReviews  = []; // Initialize user's review list
+$userMessages = []; // Initialize user's sent messages list
 $messageCount = 0; // Initialize sent contact message counter
 try {
     $db = DatabaseConnection::getInstance()->getConnection(); // Acquire shared PDO connection
@@ -165,12 +204,14 @@ try {
     $revStmt->execute([(int)$user['id']]); // Execute prepared statement bound to user ID
     $userReviews = $revStmt->fetchAll(PDO::FETCH_ASSOC); // Fetch all matching review rows
 
-    // Total contact messages sent by this user
-    $msgStmt = $db->prepare("SELECT COUNT(*) FROM contact_us WHERE reviewer_id = ?"); // Prepare count query for contact messages
-    $msgStmt->execute([(int)$user['id']]); // Execute query bound to user ID
-    $messageCount = (int)$msgStmt->fetchColumn(); // Cast scalar count result to integer
+    // Active contact messages sent by this user (newest first)
+    $msgStmt = $db->prepare("SELECT id, subject, content, sent_at FROM contact_us WHERE reviewer_id = ? AND is_active = 1 ORDER BY sent_at DESC");
+    $msgStmt->execute([(int)$user['id']]);
+    $userMessages = $msgStmt->fetchAll(PDO::FETCH_ASSOC);
+    $messageCount = count($userMessages);
 } catch (Throwable $e) { // Gracefully degrade if profile stats query fails
     $userReviews  = []; // Reset reviews list on error
+    $userMessages = []; // Reset messages list on error
     $messageCount = 0; // Reset message count on error
 }
 
