@@ -137,7 +137,7 @@ $totalPages    = max(1, (int)ceil($totalFilms / $limit));
 $page          = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
 $offset        = ($page - 1) * $limit;
 $films         = $repo->getAllFilms('', $filterGenre, $filterCountry, $limit, $offset); // Query 10 filtered films for the current admin page
-$countries     = $repo->getFilmCountries(); // Query distinct countries for header dropdown
+$countries     = $repo->getAllCountries(); // Query distinct countries for header dropdown
 $genres        = getAllGenres(); // Query all genres for the form & header dropdowns
 $showForm      = isset($_GET['add']) || !empty($editFilm); // Show Add/Edit form page only when requested
 
