@@ -131,12 +131,13 @@ if (isset($_GET['edit'])) { // Check if an edit film ID was passed in query stri
 $repo          = new CinemaRepository();
 $filterCountry = trim((string)($_GET['country'] ?? ''));
 $filterGenre   = ($_GET['genre'] ?? '') !== '' ? (int)$_GET['genre'] : '';
+$sortTitle     = in_array($_GET['sort'] ?? '', ['title_asc', 'title_desc'], true) ? (string)$_GET['sort'] : '';
 $limit         = 10;
 $totalFilms    = $repo->countFilms('', $filterGenre, $filterCountry);
 $totalPages    = max(1, (int)ceil($totalFilms / $limit));
 $page          = min(max(1, (int)($_GET['page'] ?? 1)), $totalPages);
 $offset        = ($page - 1) * $limit;
-$films         = $repo->getAllFilms('', $filterGenre, $filterCountry, $limit, $offset); // Query 10 filtered films for the current admin page
+$films         = $repo->getAllFilms('', $filterGenre, $filterCountry, $limit, $offset, $sortTitle); // Query 10 filtered/sorted films for the current admin page
 $countries     = $repo->getAllCountries(); // Query distinct countries for header dropdown
 $genres        = getAllGenres(); // Query all genres for the form & header dropdowns
 $showForm      = isset($_GET['add']) || !empty($editFilm); // Show Add/Edit form page only when requested
@@ -298,11 +299,31 @@ ob_start(); // Begin output buffering to capture films management view
                 <tr>
                     <th>#</th>
                     <th>Poster</th>
-                    <th>Title</th>
+                    <th>
+                        <div class="sortable-heading">
+                            <span>Title</span>
+                            <form method="GET" class="column-sort-form">
+                                <?php if ($filterCountry !== ''): ?>
+                                    <input type="hidden" name="country" value="<?= htmlspecialchars($filterCountry, ENT_QUOTES, 'UTF-8') ?>">
+                                <?php endif; ?>
+                                <?php if ($filterGenre !== ''): ?>
+                                    <input type="hidden" name="genre" value="<?= (int)$filterGenre ?>">
+                                <?php endif; ?>
+                                <select class="column-sort-select" name="sort" aria-label="Sort films by title" onchange="this.form.submit()">
+                                    <option value="" <?= $sortTitle === '' ? 'selected' : '' ?>>Sort title</option>
+                                    <option value="title_asc" <?= $sortTitle === 'title_asc' ? 'selected' : '' ?>>A → Z</option>
+                                    <option value="title_desc" <?= $sortTitle === 'title_desc' ? 'selected' : '' ?>>Z → A</option>
+                                </select>
+                            </form>
+                        </div>
+                    </th>
                     <th>
                         <div class="sortable-heading">
                             <span>Country</span>
                             <form method="GET" class="column-sort-form">
+                                <?php if ($sortTitle !== ''): ?>
+                                    <input type="hidden" name="sort" value="<?= htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') ?>">
+                                <?php endif; ?>
                                 <?php if ($filterGenre !== ''): ?>
                                     <input type="hidden" name="genre" value="<?= (int)$filterGenre ?>">
                                 <?php endif; ?>
@@ -321,6 +342,9 @@ ob_start(); // Begin output buffering to capture films management view
                         <div class="sortable-heading">
                             <span>Genre</span>
                             <form method="GET" class="column-sort-form">
+                                <?php if ($sortTitle !== ''): ?>
+                                    <input type="hidden" name="sort" value="<?= htmlspecialchars($sortTitle, ENT_QUOTES, 'UTF-8') ?>">
+                                <?php endif; ?>
                                 <?php if ($filterCountry !== ''): ?>
                                     <input type="hidden" name="country" value="<?= htmlspecialchars($filterCountry, ENT_QUOTES, 'UTF-8') ?>">
                                 <?php endif; ?>
@@ -452,6 +476,7 @@ ob_start(); // Begin output buffering to capture films management view
         <?php
         $pagParams = array_filter([
             'edit'    => isset($_GET['edit']) ? (int)$_GET['edit'] : null,
+            'sort'    => $sortTitle !== '' ? $sortTitle : null,
             'country' => $filterCountry !== '' ? $filterCountry : null,
             'genre'   => $filterGenre !== '' ? $filterGenre : null,
         ], static fn($v) => $v !== null);

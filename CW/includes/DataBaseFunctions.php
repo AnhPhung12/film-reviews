@@ -323,8 +323,8 @@ class CinemaRepository
         return (int)$st->fetchColumn(); // Return integer film count
     }
 
-    /** Fetches filtered films with genre name, review count, average rating, and optional pagination. */
-    public function getAllFilms(string $search = '', string|int $genreId = '', string $country = '', int $limit = 0, int $offset = 0): array
+    /** Fetches filtered films with genre name, review count, average rating, and optional pagination/sorting. */
+    public function getAllFilms(string $search = '', string|int $genreId = '', string $country = '', int $limit = 0, int $offset = 0, string $sort = ''): array
     {
         $db = $this->db; // Local reference to PDO handle
         $sql = "SELECT f.*, g.name AS genre_name, COUNT(r.id) AS review_count, ROUND(AVG(r.rating), 1) AS avg_rating
@@ -345,7 +345,12 @@ class CinemaRepository
             $sql .= " AND f.country = ?";
             $params[] = $country;
         }
-        $sql .= " GROUP BY f.id ORDER BY f.release_year DESC, f.id DESC"; // Group per film and sort newest first
+        $orderBy = match ($sort) {
+            'title_asc'  => 'f.title ASC, f.id DESC',
+            'title_desc' => 'f.title DESC, f.id DESC',
+            default      => 'f.release_year DESC, f.id DESC',
+        };
+        $sql .= " GROUP BY f.id ORDER BY {$orderBy}"; // Group per film and apply whitelisted sort order
         if ($limit > 0) { // Apply integer-cast LIMIT/OFFSET when pagination is requested
             $sql .= " LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
         }
