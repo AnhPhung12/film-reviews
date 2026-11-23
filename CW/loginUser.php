@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process login form on HTTP POST
         header('Location: index.php'); // Redirect authenticated user to homepage
         exit; // Terminate execution after redirect
     } elseif ($auth['status'] === 'suspended') {
-        $flashMessage = 'Your account is suspended. Please contact the administrator.'; // Inform suspended user clearly
+        $flashMessage = 'Your account is suspended. Please contact the administrator at jy261205@gmail.com.'; // Inform suspended user with direct contact email
         $flashType    = 'error'; // Style alert as error
     } else {
         $flashMessage = 'Invalid email or password.'; // Show generic error to avoid leaking account existence

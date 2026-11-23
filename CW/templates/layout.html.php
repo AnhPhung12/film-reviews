@@ -24,7 +24,7 @@ if (!empty($_SESSION['user_id'])) { // Only check when a user is logged in
     $activeUser = (new UserRepository())->findById((int)$_SESSION['user_id']); // Fetch fresh account status from DB
     if (!$activeUser || !empty($activeUser['is_suspended'])) { // Force logout if account was deleted or suspended
         unset($_SESSION['user_id'], $_SESSION['user_name'], $_SESSION['user_email'], $_SESSION['user_avatar']); // Clear user session keys
-        $_SESSION['flash'] = 'Your account is suspended. Please contact the administrator.'; // Set suspension notice
+        $_SESSION['flash'] = 'Your account is suspended. Please contact the administrator at jy261205@gmail.com.'; // Set suspension notice with admin email
         $_SESSION['flash_type'] = 'error'; // Style flash banner as error
         header('Location: loginUser.php'); // Redirect to login page
         exit; // Stop rendering protected layout
