@@ -33,6 +33,7 @@ $curRating  = (int)($_POST['rating'] ?? $review['rating']); // Current rating va
         <div class="form-main">
             <!-- Edit Review Form -->
             <form method="POST" action="edit.php?id=<?= $review['id'] ?>" class="review-form glass">
+                <?= CsrfHelper::input() ?>
 
                 <!-- Film (read-only) -->
                 <div class="form-section">

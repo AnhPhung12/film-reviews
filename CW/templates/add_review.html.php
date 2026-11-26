@@ -36,6 +36,7 @@ $errors = $errors ?? []; // Default to empty array when no validation errors exi
         <!-- Main form container -->
         <div class="form-main">
             <form method="POST" action="add_review.php" class="review-form glass" id="reviewForm" novalidate><!-- disable default browser validation -->
+                <?= CsrfHelper::input() ?>
 
                 <!-- Film selection with dynamic preview -->
                 <div class="form-section">

@@ -240,8 +240,33 @@ PROMPT; // Return complete instruction + RAG context prompt
             ],
         ];
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($apiKey); // Construct Gemini REST endpoint URL
-        $res = self::postJson($url, $payload, ['Content-Type: application/json']); // Send POST request via cURL
+        $fallbackModels = array_values(array_unique([
+            $model,
+            'gemini-3.5-flash-lite',
+            'gemini-3-flash-lite',
+            'gemini-2.5-flash',
+        ]));
+
+        $res = ['ok' => false, 'data' => [], 'error' => 'Gemini API request failed.'];
+        foreach ($fallbackModels as $candidateModel) {
+            $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($candidateModel) . ':generateContent?key=' . urlencode($apiKey);
+            $res = self::postJson($url, $payload, ['Content-Type: application/json']);
+            if ($res['ok']) {
+                break;
+            }
+            $errLower = strtolower((string)($res['error'] ?? ''));
+            $isTransient = strpos($errLower, 'high demand') !== false
+                || strpos($errLower, 'overloaded') !== false
+                || strpos($errLower, 'unavailable') !== false
+                || strpos($errLower, 'no longer available') !== false
+                || strpos($errLower, 'not found') !== false
+                || strpos($errLower, '503') !== false
+                || strpos($errLower, '429') !== false;
+            if (!$isTransient) {
+                break;
+            }
+        }
+
         if (!$res['ok']) { // Propagate network or HTTP error
             return ['ok' => false, 'reply' => '', 'error' => $res['error']];
         }

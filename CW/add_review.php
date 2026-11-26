@@ -14,6 +14,7 @@
 
 session_start(); // Start session to access user identity and flash messages
 require_once __DIR__ . '/includes/classes/ReviewController.php'; // Load ReviewController for persisting reviews
+require_once __DIR__ . '/includes/classes/CsrfHelper.php'; // Load CSRF helper for form protection
 $reviewCtrl = new ReviewController(); // Instantiate review controller
 
 // Redirect unauthenticated visitors to the login page
@@ -36,6 +37,10 @@ $flashType       = 'success'; // Default inline alert style
 
 // Handle POST form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process review creation only on POST requests
+    if (!CsrfHelper::verify($_POST['_csrf'] ?? null)) { // Reject forged cross-site submissions
+        $flashMessage = 'Security token expired or invalid. Please refresh and try again.';
+        $flashType    = 'error';
+    } else {
     $old = $_POST; // Preserve submitted inputs for form repopulation on error
 
     // Retrieve authenticated reviewer ID from session
@@ -93,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') { // Process review creation only on 
     } else {
         $flashMessage = 'Please fix the highlighted errors below.'; // Prompt user to fix form validation errors
         $flashType    = 'error'; // Style alert as error
+    }
     }
 }
 
